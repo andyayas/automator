@@ -65,6 +65,10 @@ anything.
 - `npm run gen:types` regenerates `src/lib/database.types.ts` after migrations.
 - `npm run seed` (dry run) / `npm run seed -- --apply` is the go-live seed. It
   writes `samples/seed-report.md` (real names, gitignored) and prints counts only.
+  People in her statement, the daily reports or recent package payments who
+  match no client are created as new clients **without a phone** (Contacts is an
+  old export of the clinic phone and misses many clients). Near-misses are never
+  merged into an existing client automatically.
 
 ### Manual setup checklist
 

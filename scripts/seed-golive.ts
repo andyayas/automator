@@ -24,7 +24,7 @@ import { read, utils, type WorkBook } from 'xlsx'
 import type { Database } from '../src/lib/database.types.ts'
 import { amountReceived, parseCashStatement, toISODate, type CashRow } from '../src/lib/cash-statement.ts'
 import { parseContacts } from '../src/lib/contacts.ts'
-import { createNameMatcher, normalizeName, tokenSortRatio, type NameMatch } from '../src/lib/names.ts'
+import { createNameMatcher, displayName, FUZZY_THRESHOLD, normalizeName, tokenSortRatio, type NameMatch } from '../src/lib/names.ts'
 import { decryptOfficeFile } from '../src/lib/office-crypto.ts'
 import { parseOldDailyReports, type OldReportRow } from '../src/lib/old-daily-report.ts'
 import { parseScheduleCell, type ParsedBooking } from '../src/lib/schedule-cell.ts'
@@ -136,7 +136,10 @@ type Proposal = {
   notes: string[]
 }
 
+type NewClient = { id: string; name: string; spellings: Set<string>; sources: Set<string>; closest: string }
+
 type Plan = {
+  newClients: NewClient[]
   proposals: Proposal[]
   finished: Array<{ name: string; detail: string }>
   dormant: Array<{ name: string; detail: string }>
@@ -148,8 +151,8 @@ type Plan = {
 }
 
 function buildPlan(
-  match: (raw: string) => NameMatch,
-  nameOf: (id: string) => string,
+  matchExisting: (raw: string) => NameMatch,
+  nameOfExisting: (id: string) => string,
   cash: CashRow[],
   candidates: Array<{ id: string; name: string }>,
 ): Plan {
@@ -162,6 +165,7 @@ function buildPlan(
     return best.score >= 0.6 ? `; closest client: "${best.name}" (${Math.round(best.score * 100)}%)` : '; no close client'
   }
   const plan: Plan = {
+    newClients: [],
     proposals: [],
     finished: [],
     dormant: [],
@@ -171,6 +175,46 @@ function buildPlan(
     unmatchedStatement: [],
     insurance: [],
   }
+
+  // New clients. Contacts is an old export of the clinic phone, so many real
+  // clients aren't in it. Anyone in her statement, the daily reports or a recent
+  // package payment who matches no client becomes a new client (no phone yet).
+  // Spellings of the same person across files are merged into one, and a
+  // near-miss is never merged into an existing client: the report shows the
+  // closest existing name so it can be linked by hand before --apply.
+  const pending = new Map<string, NewClient>()
+  let matchPending = createNameMatcher([])
+  const recentNames = [...bookings.map((b) => b.name), ...reportRows.map((r) => r.name)].map(normalizeName)
+  const addPending = (raw: string, source: string) => {
+    const name = raw.replace(/\s+/g, ' ').trim()
+    if (!normalizeName(name) || matchExisting(name).kind !== 'none') return
+    const p = matchPending(name)
+    if (p.kind !== 'none') {
+      const c = pending.get(p.id)!
+      c.spellings.add(name)
+      c.sources.add(source)
+      return
+    }
+    const id = `new:${pending.size + 1}`
+    pending.set(id, { id, name: displayName(name), spellings: new Set([name]), sources: new Set([source]), closest: closest(name) })
+    matchPending = createNameMatcher([...pending.values()].map((c) => ({ id: c.id, name: c.name })))
+  }
+  for (const t of statementRows) if (t.remaining > 0) addPending(t.name, 'her statement')
+  for (const r of reportRows) if (r.info === 'package' || r.info === 'insurance') addPending(r.name, `daily reports (${r.info})`)
+  for (const r of cash) {
+    if (r.kind !== 'package') continue
+    const key = normalizeName(r.nameRaw)
+    const recent = r.date >= firstDataDate || recentNames.some((n) => n === key || tokenSortRatio(n, key) >= FUZZY_THRESHOLD)
+    if (recent) addPending(r.nameRaw, 'cash statement (package)')
+  }
+  plan.newClients = [...pending.values()]
+
+  // From here on, names resolve to existing clients first, then new ones.
+  const match = (raw: string): NameMatch => {
+    const m = matchExisting(raw)
+    return m.kind === 'none' ? matchPending(raw) : m
+  }
+  const nameOf = (id: string) => (id.startsWith('new:') ? `${pending.get(id)!.name} (new client)` : nameOfExisting(id))
   const idFor = (raw: string) => {
     const m = match(raw)
     return m.kind === 'none' ? null : m.id
@@ -211,7 +255,6 @@ function buildPlan(
 
   // Payers not among the clients: is the person still coming in? Compare with
   // the names on the schedule and in the reports (they may be missing from Contacts).
-  const recentNames = [...bookings.map((b) => b.name), ...reportRows.map((r) => r.name)].map(normalizeName)
   for (const [key, rows] of unmatched) {
     const latest = rows.sort((a, b) => a.date.localeCompare(b.date)).at(-1)!
     const seen = recentNames.filter((n) => n === key || tokenSortRatio(n, key) >= 0.85).length
@@ -389,7 +432,7 @@ function buildPlan(
   for (const [id, rows] of onPackage) {
     const maxNo = (bookingsById.get(id) ?? []).reduce((m, b) => Math.max(m, b.sessionNo ?? 0), 0)
     plan.packageWithoutPurchase.push({
-      name: id.startsWith('?') ? `${rows[0].name} (not in Contacts)` : nameOf(id),
+      name: id.startsWith('?') ? `${rows[0].name} (no client)` : nameOf(id),
       detail: `${rows.length} package session(s) in the reports, last ${rows.at(-1)!.date}${maxNo ? `; highest session no. on the schedule: ${maxNo}` : ''}`,
     })
   }
@@ -407,7 +450,7 @@ function buildPlan(
     const paid = [...new Set(rows.map((r) => r.paid).filter((b) => b !== null))].join('/')
     const maxNo = (bookingsById.get(id) ?? []).reduce((m, b) => Math.max(m, b.sessionNo ?? 0), 0)
     plan.insurance.push({
-      name: id.startsWith('?') ? `${rows[0].name} (not in Contacts)` : nameOf(id),
+      name: id.startsWith('?') ? `${rows[0].name} (no client)` : nameOf(id),
       detail: `${rows.length} insurance session(s) ${rows[0].date}…${rows.at(-1)!.date}, billed ${billed || '?'}, client paid ${paid || '0'}${later ? `; ${later} more confirmed on the schedule to ${until}` : ''}${maxNo ? `; highest session no.: ${maxNo}` : ''}`,
     })
   }
@@ -427,6 +470,16 @@ function writeReport(plan: Plan) {
     `Files: ${[cashFile!, ...statementFiles, ...reportFiles, ...scheduleFiles].map((f) => f.replace(`${SAMPLES}/`, '')).join(', ')}.`,
     statementFiles.length ? 'Where her Statement of Account lists a package, her count of sessions remaining is used.' : '',
     `Daily reports run to ${lastReportDate}; after that, sessions come from the schedule's C marks.`,
+    '',
+    `## New clients to add (${plan.newClients.length})`,
+    '',
+    'Not found among the clients (Contacts is incomplete). The seed adds each one with **no phone**; fill phones in later.',
+    'If one of them **is** an existing client (see "closest"), open that client in the app and add this spelling under',
+    'Name variants before running `--apply`. Then the seed links to that client instead of adding a new one.',
+    '',
+    ...plan.newClients.map(
+      (c) => `- **${c.name}**: from ${[...c.sources].join(', ')}${c.spellings.size > 1 ? `; spellings: ${[...c.spellings].map((x) => `"${x}"`).join(', ')}` : ''}${c.closest}`,
+    ),
     '',
     `## Packages to propose (${plan.proposals.length})`,
     '',
@@ -513,6 +566,26 @@ async function main() {
   const plan = buildPlan(matcher, (id) => names.get(id) ?? id, cash, clients)
   writeReport(plan)
 
+  // Create the new clients (no phone), and keep their other spellings as name variants.
+  const newIds = new Map<string, string>()
+  for (const c of plan.newClients) {
+    const { data, error } = await db
+      .from('clients')
+      .insert({ name: c.name, notes: 'Added by the go-live seed: not in the Contacts tab. Phone unknown.' })
+      .select('id')
+      .single()
+    if (error) throw error
+    newIds.set(c.id, data.id)
+    const aliases = [...new Set([...c.spellings].map(normalizeName))].filter((a) => a && a !== normalizeName(c.name))
+    if (aliases.length) {
+      const { error: aliasErr } = await db
+        .from('client_aliases')
+        .upsert(aliases.map((alias) => ({ client_id: data.id, alias })), { onConflict: 'owner_id,alias', ignoreDuplicates: true })
+      if (aliasErr) throw aliasErr
+    }
+  }
+  for (const p of plan.proposals) if (p.clientId.startsWith('new:')) p.clientId = newIds.get(p.clientId)!
+
   const { data: existing, error: existingError } = await db.from('packages').select('client_id, purchased_on, sessions_total')
   if (existingError) throw existingError
   const have = new Set(existing.map((p) => `${p.client_id}|${p.purchased_on}|${p.sessions_total}`))
@@ -535,13 +608,15 @@ async function main() {
     if (error) throw error
   }
   summary(plan)
-  console.log(`\nInserted ${rows.length} proposed package(s); ${plan.proposals.length - rows.length} were already there.`)
+  console.log(`\nAdded ${newIds.size} new client(s) without a phone.`)
+  console.log(`Inserted ${rows.length} proposed package(s); ${plan.proposals.length - rows.length} were already there.`)
   console.log('Full report: samples/seed-report.md')
   await db.auth.signOut()
 }
 
 function summary(plan: Plan) {
   console.log(`Sessions counted up to ${until} (daily reports to ${lastReportDate}, schedule after).`)
+  console.log(`New clients to add (no phone):  ${plan.newClients.length}`)
   console.log(`Packages to propose:            ${plan.proposals.length} (${plan.proposals.filter((p) => p.fromStatement).length} from her statement, ${plan.proposals.filter((p) => !p.usedKnown).length} with an uncertain count)`)
   console.log(`Statement rows not matched:     ${plan.unmatchedStatement.length}`)
   console.log(`Insurance clients to enter:     ${plan.insurance.length}`)
