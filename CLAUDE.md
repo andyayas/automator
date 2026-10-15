@@ -55,9 +55,9 @@ anything.
 - [x] Supabase region: `eu-central-1` (Frankfurt).
 - [x] Supabase CLI linked to `ljwscptbrwpibbbfgdpk` (no DB password needed;
       the CLI uses a temporary login role).
-- [ ] GitHub Pages source = GitHub Actions (try `gh api` first).
-- [ ] GitHub Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
-      (try `gh variable set` first).
+- [x] GitHub Pages source = GitHub Actions (set via `gh api`).
+- [x] GitHub Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+      (set via `gh variable set`).
 
 ## Principles
 
