@@ -2,13 +2,16 @@
 // day she reopened and corrected appears corrected).
 
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
-import { expenseKey } from './day-builder'
+import { expenseKey, OTHER_INCOME } from './day-builder'
 import { displayName } from './names'
 import type { ReportData, ReportRow } from './report'
 import type { Tables } from './database.types'
 
 type Session = Tables<'day_sessions'>
-type Expense = Pick<Tables<'cash_transactions'>, 'date' | 'name_raw' | 'description' | 'credit' | 'pos_amount'>
+type Expense = Pick<Tables<'cash_transactions'>, 'date' | 'name_raw' | 'description' | 'credit' | 'pos_amount'> &
+  Partial<Pick<Tables<'cash_transactions'>, 'kind' | 'debit'>>
+type Line = { label: string; amount: number }
+type Snapshot = { date: string; expenses: unknown; other_income: unknown }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -31,6 +34,8 @@ export function monthReportDays(input: {
   sessions: Session[]
   expenses: Expense[]
   labels: Map<string, string>
+  /** What she confirmed for each day (expense and other-income lines); preferred over recomputing. */
+  snapshots?: Snapshot[]
   packages: PackageWithBalance[]
   approvals: ApprovalWithBalance[]
 }): Array<{ date: string; sheetName: string; data: ReportData }> {
@@ -49,12 +54,22 @@ export function monthReportDays(input: {
       note: s.extra_note ?? '',
     })
     const section = (t: string) => sessions.filter((s) => s.billing_type === t).map(toRow)
-    const expenses = input.expenses
-      .filter((e) => e.date === date)
-      .map((e) => ({
-        label: input.labels.get(expenseKey(e.name_raw, e.description)) ?? displayName(e.description || e.name_raw || 'Expense'),
-        amount: Number(e.credit ?? e.pos_amount ?? 0),
-      }))
+    const snap = input.snapshots?.find((x) => x.date === date)
+    const cash = input.expenses.filter((e) => e.date === date)
+    const label = (e: Expense, fallback: string) => input.labels.get(expenseKey(e.name_raw, e.description)) ?? fallback
+    const expenses: Line[] = Array.isArray(snap?.expenses)
+      ? (snap!.expenses as Line[])
+      : cash
+          .filter((e) => (e.kind ?? 'expense') === 'expense')
+          .map((e) => ({ label: label(e, displayName(e.description || e.name_raw || 'Expense')), amount: Number(e.credit ?? e.pos_amount ?? 0) }))
+    const otherIncome: Line[] = Array.isArray(snap?.other_income)
+      ? (snap!.other_income as Line[])
+      : cash
+          .filter((e) => e.kind === 'insurer_payment' || (e.kind !== 'expense' && e.kind !== undefined && OTHER_INCOME.test(e.description ?? '')))
+          .map((e) => ({
+            label: label(e, e.kind === 'insurer_payment' ? `${displayName(e.name_raw ?? '')} payment` : displayName(e.description ?? 'Other income')),
+            amount: Number(e.debit ?? e.pos_amount ?? 0),
+          }))
     return {
       date,
       sheetName: sheetNameFor(date),
@@ -62,6 +77,7 @@ export function monthReportDays(input: {
         dateLabel: new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
         sections: { insurance: section('insurance'), package: section('package'), per_session: section('per_session'), free: section('free') },
         expenses,
+        otherIncome,
         totalClients: new Set(sessions.map((s) => s.client_id ?? `name:${(s.client_name ?? '').toLowerCase()}`)).size,
         packageNotPaid: sessions.filter((s) => s.billing_type === 'package' && s.package_id && unpaid.has(s.package_id)).length,
       },

@@ -21,6 +21,8 @@ export type ReportData = {
   dateLabel: string
   sections: Record<BillingType, ReportRow[]>
   expenses: Array<{ label: string; amount: number }>
+  /** Money in that isn't a client session (insurer payments, outdoor, tests…). */
+  otherIncome: Array<{ label: string; amount: number }>
   totalClients: number
   packageNotPaid: number
 }
@@ -239,14 +241,32 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   span('A', 'B', expTotal, 'Total Expenses', s.expTotal)
   put(`C${expTotal}`, f(`SUM(C${top + 1}:C${expTotal - 1})`, totalExpenses), s.expTotalNum)
 
+  // Other income (left, under the expenses), in the same style.
+  const otherTop = expTotal + 2
+  span('A', 'B', otherTop, 'Other Income', s.expHeader)
+  put(`C${otherTop}`, 'Amount', s.expHeaderNum)
+  const otherRows = data.otherIncome.length ? data.otherIncome : [{ label: '', amount: null as unknown as number }]
+  otherRows.forEach((e, i) => {
+    span('A', 'B', otherTop + 1 + i, e.label || null, s.expText)
+    put(`C${otherTop + 1 + i}`, e.amount ?? null, s.expNum)
+  })
+  const otherTotalRow = otherTop + 1 + otherRows.length
+  const totalOther = sum(data.otherIncome.map((e) => e.amount))
+  span('A', 'B', otherTotalRow, 'Total Other Income', s.expTotal)
+  put(`C${otherTotalRow}`, f(`SUM(C${otherTop + 1}:C${otherTotalRow - 1})`, totalOther), s.expTotalNum)
+
   const incomeTop = top + summary.length + 1
   span('F', 'G', incomeTop, 'Income / Expenses', s.incomeHeader)
-  put(`F${incomeTop + 1}`, 'Income (total collected)', s.sumLabel)
+  put(`F${incomeTop + 1}`, 'Collected from clients', s.sumLabel)
   put(`G${incomeTop + 1}`, f(`G${collectedRow}`, totalCollected), money)
-  put(`F${incomeTop + 2}`, 'Expenses', s.sumLabel)
-  put(`G${incomeTop + 2}`, f(`C${expTotal}`, totalExpenses), money)
-  put(`F${incomeTop + 3}`, 'Net', s.sumLabel)
-  put(`G${incomeTop + 3}`, f(`G${incomeTop + 1}-G${incomeTop + 2}`, totalCollected - totalExpenses), money)
+  put(`F${incomeTop + 2}`, 'Other income', s.sumLabel)
+  put(`G${incomeTop + 2}`, f(`C${otherTotalRow}`, totalOther), money)
+  put(`F${incomeTop + 3}`, 'Income (total)', s.sumLabel)
+  put(`G${incomeTop + 3}`, f(`G${incomeTop + 1}+G${incomeTop + 2}`, totalCollected + totalOther), money)
+  put(`F${incomeTop + 4}`, 'Expenses', s.sumLabel)
+  put(`G${incomeTop + 4}`, f(`C${expTotal}`, totalExpenses), money)
+  put(`F${incomeTop + 5}`, 'Net', s.sumLabel)
+  put(`G${incomeTop + 5}`, f(`G${incomeTop + 3}-G${incomeTop + 4}`, totalCollected + totalOther - totalExpenses), money)
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
   // The template hides gridlines (showGridLines="false"), but ExcelJS reads that

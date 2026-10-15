@@ -70,7 +70,13 @@ export async function fetchRecentReviews(dates: string[]): Promise<DayReview[]> 
  * which is what deducts them from packages and approvals, and learns any
  * expense labels she corrected.
  */
-export async function confirmDay(date: string, rows: DayRow[], expenses: ExpenseLine[], editedLabels: Map<string, string>) {
+export async function confirmDay(
+  date: string,
+  rows: DayRow[],
+  expenses: ExpenseLine[],
+  editedLabels: Map<string, string>,
+  otherIncome: ExpenseLine[] = [],
+) {
   const { error: delError } = await supabase.from('day_sessions').delete().eq('date', date)
   fail(delError)
   if (rows.length) {
@@ -97,10 +103,21 @@ export async function confirmDay(date: string, rows: DayRow[], expenses: Expense
   }
   const { error: reviewError } = await supabase
     .from('day_reviews')
-    .upsert({ date, confirmed_at: new Date().toISOString() }, { onConflict: 'owner_id,date' })
+    .upsert(
+      {
+        date,
+        confirmed_at: new Date().toISOString(),
+        // What she confirmed besides the sessions, with her labels (for the month file).
+        expenses: expenses.map((e) => ({ label: editedLabels.get(e.cashId) ?? e.label, amount: e.amount })),
+        other_income: otherIncome.map((e) => ({ label: editedLabels.get(e.cashId) ?? e.label, amount: e.amount })),
+      },
+      { onConflict: 'owner_id,date' },
+    )
   fail(reviewError)
 
-  const learned = expenses.filter((e) => editedLabels.has(e.cashId)).map((e) => ({ match_key: e.matchKey, label: editedLabels.get(e.cashId)! }))
+  const learned = [...expenses, ...otherIncome]
+    .filter((e) => editedLabels.has(e.cashId))
+    .map((e) => ({ match_key: e.matchKey, label: editedLabels.get(e.cashId)! }))
   if (learned.length) {
     const { error } = await supabase.from('expense_labels').upsert(learned, { onConflict: 'owner_id,match_key' })
     fail(error)
@@ -205,27 +222,31 @@ export async function downloadSavedReport(path: string): Promise<Uint8Array> {
 }
 
 /** Everything the month file needs, plus the working days not confirmed yet. */
-export async function fetchMonth(month: string, today: string) {
+export async function fetchMonth(month: string, today: string, reviewsFrom: string | null = null) {
   const { from, to } = monthRange(month)
   const [reviews, sessions, expenses, labels, scheduled] = await Promise.all([
-    supabase.from('day_reviews').select('date').gte('date', from).lte('date', to).not('confirmed_at', 'is', null),
+    supabase.from('day_reviews').select('date, expenses, other_income').gte('date', from).lte('date', to).not('confirmed_at', 'is', null),
     supabase.from('day_sessions').select('*').gte('date', from).lte('date', to).eq('confirmed', true).order('created_at'),
     supabase
       .from('cash_transactions')
-      .select('date, name_raw, description, credit, pos_amount')
+      .select('date, name_raw, description, credit, debit, pos_amount, kind')
       .gte('date', from)
       .lte('date', to)
-      .eq('kind', 'expense')
+      .in('kind', ['expense', 'insurer_payment', 'other', 'session'])
       .eq('missing_from_source', false),
     supabase.from('expense_labels').select('match_key, label'),
     supabase.from('schedule_entries').select('date').gte('date', from).lte('date', to < today ? to : today).eq('is_non_client', false),
   ])
   for (const r of [reviews, sessions, expenses, labels, scheduled]) fail(r.error)
   const confirmedDates = reviews.data!.map((r) => r.date)
-  const notConfirmed = [...new Set(scheduled.data!.map((s) => s.date))].filter((d) => !confirmedDates.includes(d)).sort()
+  // Days before "daily reviews start on" were reported outside the app.
+  const notConfirmed = [...new Set(scheduled.data!.map((s) => s.date))]
+    .filter((d) => !confirmedDates.includes(d) && (!reviewsFrom || d >= reviewsFrom))
+    .sort()
   return {
     confirmedDates,
     notConfirmed,
+    snapshots: reviews.data!,
     sessions: sessions.data!,
     expenses: expenses.data!,
     labels: new Map(labels.data!.map((l) => [l.match_key, l.label])),

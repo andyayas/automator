@@ -177,8 +177,10 @@ export type Database = {
           confirmed_at: string | null
           created_at: string
           date: string
+          expenses: Json | null
           id: string
           notes: string | null
+          other_income: Json | null
           owner_id: string
           report_generated_at: string | null
           report_storage_path: string | null
@@ -188,8 +190,10 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string
           date: string
+          expenses?: Json | null
           id?: string
           notes?: string | null
+          other_income?: Json | null
           owner_id?: string
           report_generated_at?: string | null
           report_storage_path?: string | null
@@ -199,8 +203,10 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string
           date?: string
+          expenses?: Json | null
           id?: string
           notes?: string | null
+          other_income?: Json | null
           owner_id?: string
           report_generated_at?: string | null
           report_storage_path?: string | null

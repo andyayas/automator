@@ -33,6 +33,7 @@ export function SettingsPage() {
       <PageHeader title="Settings" back="/more" />
       <TemplateSettings />
       <PriceSettings settings={settings.data} />
+      <ReviewsFromSetting settings={settings.data} />
       <ReminderSettings settings={settings.data} />
       <SheetLinks settings={settings.data} />
       <StaffNames settings={settings.data} />
@@ -334,6 +335,30 @@ function PriceSettings({ settings }: { settings: Record<string, unknown> }) {
         {note && <p className={isError ? 'error' : 'muted small'}>{note}</p>}
         <button type="submit" className="button">
           Save prices
+        </button>
+      </form>
+    </Section>
+  )
+}
+
+function ReviewsFromSetting({ settings }: { settings: Record<string, unknown> }) {
+  const [value, setValue] = useState((settings[SETTING.reviewsFrom] as string | undefined) ?? '')
+  const { save, note, isError } = useSaver()
+  return (
+    <Section title="Daily reviews">
+      <form
+        className="card form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save(SETTING.reviewsFrom, value || null)
+        }}
+      >
+        <Field label="Daily reviews start on" hint="Earlier days were reported by hand, so they aren't listed as “not confirmed”.">
+          <input type="date" value={value} onChange={(e) => setValue(e.target.value)} />
+        </Field>
+        {note && <p className={isError ? 'error' : 'muted small'}>{note}</p>}
+        <button type="submit" className="button">
+          Save
         </button>
       </form>
     </Section>

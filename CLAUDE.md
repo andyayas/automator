@@ -386,6 +386,15 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   cancellations are charged the full fee, so allow her to mark it as charged.
 - **Rescheduled (R)**: excluded by default, but shown in review.
 - **Payments with no appointment**: add as a row with no therapist, and flag it.
+- **Other income** (her decision, 2026-10-16): money in that isn't a client
+  session goes to an **Other Income** table in the report, like Expense
+  Details: insurer payments, and descriptions with outdoor, commission, tests
+  (Bodydot, body composition, InBody). Outdoor sessions count here, not as
+  clinic sessions. She can move any cash row between other income and a
+  client session. Income = collected + other income; Net = income − expenses.
+- **Daily reviews start on 8 October 2026** (`settings.reviews_from`): she made
+  the 1–7 October reports by hand, so earlier days aren't listed as "not
+  confirmed".
 - **Name matching**: normalize (trim, lowercase, collapse spaces, strip
   status/number/amount tokens), then exact alias → fuzzy (token-sort ratio ≥ 0.85)
   against known clients → Contacts. Every confirmed match is saved as an alias,
@@ -423,7 +432,9 @@ nothing until she accepts them.
   approval_id, session_no, billed, collected, extra_note, confirmed. **This is
   what deductions count from.** Sessions used = count of confirmed rows linked
   to that package or approval.
-- `day_reviews`: date (unique), confirmed_at, report_storage_path
+- `day_reviews`: date (unique), confirmed_at, report_storage_path,
+  report_generated_at, expenses and other_income (JSON: the lines and labels she
+  confirmed, used by the month file)
 - `reminders`: date, slot_time, therapist, client_id, phone_used, sent_at
   (unique on date + slot_time + client_id)
 - `imports`: kind (cash/schedule), filename, imported_at, rows_added,

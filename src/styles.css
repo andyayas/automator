@@ -1204,3 +1204,21 @@ details.card[open] > summary {
 .month-download p {
   margin: 0;
 }
+
+.income-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px;
+}
+
+.income-row + .income-row {
+  border-top: 1px solid var(--border);
+}
+
+.income-row-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}

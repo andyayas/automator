@@ -169,7 +169,7 @@ describe('buildDayDraft', () => {
     expect(d.rows[0].flags.map((f) => f.kind)).toEqual(['package-to-review'])
   })
 
-  it('lists expenses with learned labels and keeps insurer payments apart', () => {
+  it('lists expenses with learned labels and puts insurer payments in other income', () => {
     const d = buildDayDraft(
       inputs({
         cash: [
@@ -183,7 +183,7 @@ describe('buildDayDraft', () => {
       ['Water 5 boxes', 12],
       ['Cleaning Supplies', 8],
     ])
-    expect(d.insurerPayments).toMatchObject([{ amount: 900 }])
+    expect(d.otherIncome).toMatchObject([{ label: 'Testinsure payment', amount: 900 }])
     expect(d.rows).toEqual([])
   })
 
@@ -224,7 +224,7 @@ describe('applyEdits and toReportData', () => {
 
   it('builds report sections in time order and counts unpaid packages', () => {
     const { rows } = applyEdits(draft, emptyEdits())
-    const data = toReportData(rows, [{ label: 'Coffee', amount: 6 }], [{ ...pkg('p1', 'omar', 2), amount_paid: 100 }], '16 October 2026')
+    const data = toReportData(rows, [{ label: 'Coffee', amount: 6 }], [], [{ ...pkg('p1', 'omar', 2), amount_paid: 100 }], '16 October 2026')
     expect(data.sections.package.map((r) => [r.client, r.sessionNo])).toEqual([['Omar Sample', 3]])
     expect(data.sections.per_session.map((r) => r.client)).toEqual(['Jane Testerson'])
     expect(data.totalClients).toBe(2)
@@ -284,5 +284,45 @@ describe('days already covered by "sessions already used"', () => {
     expect(past.rows[0]).toMatchObject({ billingType: 'package', packageId: 'p1', sessionNo: 6, flags: [] })
     const after = buildDayDraft(inputs({ date: '2026-10-15', entries: [entry({ client_id: 'omar' })], packages: [covered] }))
     expect(after.rows[0].flags.map((f) => f.kind)).toEqual(['exhausted'])
+  })
+})
+
+describe('other income', () => {
+  const cashRows = [
+    cash({ id: 'out', client_id: 'jane', description: '2 outdoor session', debit: 90, kind: 'session' }),
+    cash({ id: 'bd', name_raw: 'someone', description: 'bodydot test', debit: 25, kind: 'other' }),
+    cash({ id: 'com', name_raw: 'gym x', description: 'outdoor comission', debit: 60, kind: 'other' }),
+    cash({ id: 'walk', name_raw: 'mystery payer', description: 'payment', debit: 30, kind: 'other' }),
+  ]
+
+  it('puts outdoor, tests and commissions in other income, not in client rows', () => {
+    const d = buildDayDraft(inputs({ cash: cashRows }))
+    expect(d.otherIncome.map((e) => [e.cashId, e.amount])).toEqual([
+      ['out', 90],
+      ['bd', 25],
+      ['com', 60],
+    ])
+    expect(d.otherIncome[0].label).toBe('2 Outdoor Session · Someone')
+    expect(d.rows.map((r) => r.clientName)).toEqual(['Mystery Payer'])
+  })
+
+  it('moves rows between other income and client sessions when she says so', () => {
+    const d = buildDayDraft(inputs({ cash: cashRows, asIncome: new Set(['walk']), asSession: new Set(['out']) }))
+    expect(d.otherIncome.map((e) => e.cashId)).toEqual(['bd', 'com', 'walk'])
+    expect(d.rows).toMatchObject([{ clientName: 'Jane Testerson', collected: 90, status: 'walk-in' }])
+  })
+
+  it('month file uses what she confirmed for the day', () => {
+    const days = monthReportDays({
+      confirmedDates: ['2026-10-16'],
+      sessions: [],
+      expenses: [{ date: '2026-10-16', name_raw: 'x', description: 'coffee', credit: 6, pos_amount: null, kind: 'expense' }],
+      labels: new Map(),
+      snapshots: [{ date: '2026-10-16', expenses: [{ label: 'Coffee', amount: 6 }], other_income: [{ label: 'Insurer payment', amount: 900 }] }],
+      packages: [],
+      approvals: [],
+    })
+    expect(days[0].data.otherIncome).toEqual([{ label: 'Insurer payment', amount: 900 }])
+    expect(days[0].data.expenses).toEqual([{ label: 'Coffee', amount: 6 }])
   })
 })

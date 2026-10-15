@@ -4,13 +4,20 @@ import { Link } from 'react-router'
 import { downloadFile, downloadTemplate, fetchMonth } from '../lib/day-api'
 import { formatDate, plural, todayISO } from '../lib/format'
 import { monthReportDays } from '../lib/month-report'
-import { useApprovals, usePackages } from '../lib/queries'
+import { SETTING } from '../lib/defaults'
+import { useApprovals, usePackages, useSettings } from '../lib/queries'
 
 /** One Excel file for the month: a tab per confirmed day, like her old monthly workbooks. */
 export function MonthDownload({ date }: { date: string }) {
   const month = date.slice(0, 7)
   const monthName = new Date(`${month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
-  const data = useQuery({ queryKey: ['day-review', 'month', month], queryFn: () => fetchMonth(month, todayISO()) })
+  const settings = useSettings()
+  const reviewsFrom = (settings.data?.[SETTING.reviewsFrom] as string | undefined) ?? null
+  const data = useQuery({
+    queryKey: ['day-review', 'month', month, reviewsFrom],
+    queryFn: () => fetchMonth(month, todayISO(), reviewsFrom),
+    enabled: Boolean(settings.data),
+  })
   const packages = usePackages()
   const approvals = useApprovals()
   const [busy, setBusy] = useState(false)

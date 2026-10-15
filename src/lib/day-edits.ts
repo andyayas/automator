@@ -17,11 +17,14 @@ export type DayEdits = {
   restored: string[]
   /** Rows she added by hand. */
   added: DayRow[]
-  /** Expense label corrections, by cash row id. */
+  /** Expense and other-income label corrections, by cash row id. */
   labels: Record<string, string>
+  /** Cash rows she moved to "other income", or back to a client session. */
+  asIncome: string[]
+  asSession: string[]
 }
 
-export const emptyEdits = (): DayEdits => ({ rows: {}, removed: [], restored: [], added: [], labels: {} })
+export const emptyEdits = (): DayEdits => ({ rows: {}, removed: [], restored: [], added: [], labels: {}, asIncome: [], asSession: [] })
 
 export function applyEdits(draft: DayDraft, edits: DayEdits): { rows: DayRow[]; excluded: DayRow[] } {
   const restored = draft.excluded.filter((r) => edits.restored.includes(r.key)).map((r) => ({ ...r, status: 'confirmed' as const }))
@@ -45,6 +48,7 @@ export function applyEdits(draft: DayDraft, edits: DayEdits): { rows: DayRow[]; 
 export function toReportData(
   rows: DayRow[],
   expenses: Array<{ label: string; amount: number }>,
+  otherIncome: Array<{ label: string; amount: number }>,
   packages: PackageWithBalance[],
   dateLabel: string,
   _approvals: ApprovalWithBalance[] = [],
@@ -67,6 +71,7 @@ export function toReportData(
     dateLabel,
     sections: { insurance: section('insurance'), package: section('package'), per_session: section('per_session'), free: section('free') },
     expenses,
+    otherIncome,
     totalClients: new Set(rows.map((r) => r.clientId ?? `name:${r.clientName.toLowerCase()}`)).size,
     packageNotPaid: rows.filter((r) => r.billingType === 'package' && r.packageId && unpaid.has(r.packageId)).length,
   }

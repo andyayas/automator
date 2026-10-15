@@ -31,6 +31,8 @@ export const SETTING = {
   insuranceBilled: 'insurance_billed',
   /** The cash statement's file password, kept in her private settings (RLS), never in code. */
   cashPassword: 'cash_password',
+  /** First day reviewed in the app; earlier days were reported by hand. */
+  reviewsFrom: 'reviews_from',
 } as const
 
 /** Used when a setting hasn't been set yet. */

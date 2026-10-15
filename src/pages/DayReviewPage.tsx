@@ -94,8 +94,10 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       clientNames: new Map(clients.data.map((c) => [c.id, c.name])),
       expenseLabels: labels.data,
       defaults,
+      asIncome: new Set(edits.asIncome),
+      asSession: new Set(edits.asSession),
     })
-  }, [date, entries.data, cash.data, packages.data, approvals.data, clients.data, labels.data, defaults])
+  }, [date, entries.data, cash.data, packages.data, approvals.data, clients.data, labels.data, defaults, edits.asIncome, edits.asSession])
 
   const confirmed = Boolean(review.data?.review?.confirmed_at)
   const final = useMemo(() => (draft ? applyEdits(draft, edits) : null), [draft, edits])
@@ -103,7 +105,18 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     () => (draft?.expenses ?? []).map((e) => ({ ...e, label: edits.labels[e.cashId] ?? e.label })),
     [draft, edits.labels],
   )
+  const otherIncome = useMemo(
+    () => (draft?.otherIncome ?? []).map((e) => ({ ...e, label: edits.labels[e.cashId] ?? e.label })),
+    [draft, edits.labels],
+  )
   const update = (fn: (e: DayEdits) => DayEdits) => setEdits((prev) => fn(structuredClone(prev)))
+  /** Move cash rows between "other income" and a client session. */
+  const moveCash = (ids: string[], to: 'income' | 'session') =>
+    update((e) => ({
+      ...e,
+      asIncome: to === 'income' ? [...new Set([...e.asIncome, ...ids])] : e.asIncome.filter((x) => !ids.includes(x)),
+      asSession: to === 'session' ? [...new Set([...e.asSession, ...ids])] : e.asSession.filter((x) => !ids.includes(x)),
+    }))
   const editRow = (key: string, change: RowEdit) => update((e) => ({ ...e, rows: { ...e.rows, [key]: { ...e.rows[key], ...change } } }))
 
   if (review.isError || entries.isError || cash.isError) {
@@ -119,7 +132,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   async function makeReport(rowsForReport: DayRow[]) {
     const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
     const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    return buildReport(templateBytes, toReportData(rowsForReport, expenses, packages.data ?? [], dateLabel))
+    return buildReport(templateBytes, toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel))
   }
 
   async function onPreview() {
@@ -140,7 +153,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setBusy('Saving the day…')
     setError(null)
     try {
-      await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)))
+      await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)), draft.otherIncome)
       setBusy('Filling the report…')
       const bytes = await makeReport(final.rows)
       setBusy('Saving the report…')
@@ -185,6 +198,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     billed: rows.reduce((s, r) => s + r.billed, 0),
     collected: rows.reduce((s, r) => s + r.collected, 0),
     expenses: expenses.reduce((s, e) => s + e.amount, 0),
+    otherIncome: otherIncome.reduce((s, e) => s + e.amount, 0),
   }
 
   return (
@@ -214,7 +228,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
             <div>
               <p className="strong">{plural(rows.length, 'client')}</p>
               <p className="muted small">
-                Billed {formatMoney(totals.billed)} · Collected {formatMoney(totals.collected)} · Expenses {formatMoney(totals.expenses)}
+                Billed {formatMoney(totals.billed)} · Collected {formatMoney(totals.collected)}
+                {totals.otherIncome ? ` · Other income ${formatMoney(totals.otherIncome)}` : ''} · Expenses {formatMoney(totals.expenses)}
               </p>
             </div>
             {attention.length ? <Badge tone="warn">{attention.length} to check</Badge> : <Badge tone="accent">All clear</Badge>}
@@ -232,6 +247,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
                     onFree={() => editRow(r.key, { billingType: 'free', billed: 0 })}
                     onCame={() => editRow(r.key, {})}
                     onRemove={() => update((e) => ({ ...e, removed: [...e.removed, r.key] }))}
+                    onIncome={r.status === 'walk-in' && r.cashIds.length ? () => moveCash(r.cashIds, 'income') : undefined}
                   />
                 ))}
               </div>
@@ -306,19 +322,39 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
             ) : (
               <p className="empty">No expenses in the cash statement for this day.</p>
             )}
-            {draft!.insurerPayments.length > 0 && (
-              <p className="muted small">
-                Insurer payments today (not in client totals):{' '}
-                {draft!.insurerPayments.map((p) => `${p.name} ${formatMoney(p.amount)}`).join(', ')}
-              </p>
+          </Section>
+
+          <Section title="Other income" count={otherIncome.length}>
+            <p className="muted small">Money in that isn’t a client session: insurer payments, outdoor, tests…</p>
+            {otherIncome.length ? (
+              <div className="card list">
+                {otherIncome.map((e) => (
+                  <div key={e.cashId} className="income-row">
+                    <input
+                      className="inline-input"
+                      value={e.label}
+                      aria-label="Other income label"
+                      onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
+                    />
+                    <div className="income-row-foot">
+                      <span className="strong">{formatMoney(e.amount)}</span>
+                      <button type="button" className="button ghost small-button" onClick={() => moveCash([e.cashId], 'session')}>
+                        It’s a client session
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty">None for this day.</p>
             )}
           </Section>
 
           <div className="confirm-bar">
-            <button type="button" className="button block" disabled={Boolean(busy) || !rows.length} onClick={onPreview}>
+            <button type="button" className="button block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onPreview}>
               Preview report
             </button>
-            <button type="button" className="button primary block" disabled={Boolean(busy) || !rows.length} onClick={onConfirm}>
+            <button type="button" className="button primary block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onConfirm}>
               {busy ?? 'Confirm and generate report'}
             </button>
             <p className="muted small center">
@@ -401,6 +437,7 @@ function RowCard({
   onFree,
   onCame,
   onRemove,
+  onIncome,
 }: {
   row: DayRow
   onEdit: () => void
@@ -408,6 +445,7 @@ function RowCard({
   onFree?: () => void
   onCame?: () => void
   onRemove?: () => void
+  onIncome?: () => void
 }) {
   const kinds = new Set(r.flags.map((f) => f.kind))
   return (
@@ -437,6 +475,11 @@ function RowCard({
             {(kinds.has('unmatched') || kinds.has('uncertain-name')) && onLink && (
               <button type="button" className="button small-button primary" onClick={onLink}>
                 Who is this?
+              </button>
+            )}
+            {onIncome && (
+              <button type="button" className="button small-button" onClick={onIncome}>
+                Other income
               </button>
             )}
             {kinds.has('not-paid') && onFree && (

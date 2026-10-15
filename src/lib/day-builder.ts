@@ -45,7 +45,11 @@ export type DayRow = {
 }
 
 export type ExpenseLine = { cashId: string; label: string; amount: number; matchKey: string }
-export type InsurerPayment = { cashId: string; name: string; amount: number }
+/** Money in that isn't a client session: insurer payments, outdoor, tests… */
+export type IncomeLine = ExpenseLine
+
+/** Descriptions that are income but not a clinic session (her call: outdoor counts here). */
+export const OTHER_INCOME = /outdoor|comm?is+ion|body ?dot|body composition|in ?body|\btests?\b/i
 
 export type DayDraft = {
   date: string
@@ -53,7 +57,7 @@ export type DayDraft = {
   /** Cancelled (X) and rescheduled (R) bookings: not counted, shown for reference. */
   excluded: DayRow[]
   expenses: ExpenseLine[]
-  insurerPayments: InsurerPayment[]
+  otherIncome: IncomeLine[]
 }
 
 export type EntryInput = {
@@ -91,6 +95,9 @@ export type DayInputs = {
   clientNames: Map<string, string>
   expenseLabels: Map<string, string>
   defaults: { perSessionPrice: number; insuranceBilled: number }
+  /** Cash rows she moved to "other income" / back to a client session. */
+  asIncome?: Set<string>
+  asSession?: Set<string>
 }
 
 const CLIENT_CASH = new Set(['session', 'package', 'insurance_copay', 'other'])
@@ -108,7 +115,11 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   const clientCash = new Map<string, CashInput[]>()
   const unknownCash = new Map<string, CashInput[]>()
   const expenses: ExpenseLine[] = []
-  const insurerPayments: InsurerPayment[] = []
+  const otherIncome: IncomeLine[] = []
+  const asIncome = input.asIncome ?? new Set<string>()
+  const asSession = input.asSession ?? new Set<string>()
+  const isOtherIncome = (c: CashInput) =>
+    asIncome.has(c.id) || (!asSession.has(c.id) && (c.kind === 'insurer_payment' || OTHER_INCOME.test(c.description ?? '')))
   for (const c of input.cash) {
     if (c.kind === 'expense') {
       const matchKey = expenseKey(c.name_raw, c.description)
@@ -118,9 +129,19 @@ export function buildDayDraft(input: DayInputs): DayDraft {
         label: input.expenseLabels.get(matchKey) ?? displayName(c.description || c.name_raw || 'Expense'),
         amount: Number(c.credit ?? c.pos_amount ?? 0),
       })
-    } else if (c.kind === 'insurer_payment') {
-      insurerPayments.push({ cashId: c.id, name: displayName(c.name_raw ?? ''), amount: received(c) })
-    } else if (CLIENT_CASH.has(c.kind)) {
+    } else if (isOtherIncome(c)) {
+      const matchKey = expenseKey(c.name_raw, c.description)
+      const who = displayName(c.name_raw ?? '')
+      const what = displayName(c.description ?? '')
+      otherIncome.push({
+        cashId: c.id,
+        matchKey,
+        label:
+          input.expenseLabels.get(matchKey) ??
+          (c.kind === 'insurer_payment' ? `${who} payment` : [what, who].filter(Boolean).join(' · ') || 'Other income'),
+        amount: received(c),
+      })
+    } else if (CLIENT_CASH.has(c.kind) || c.kind === 'insurer_payment') {
       if (c.client_id) clientCash.set(c.client_id, [...(clientCash.get(c.client_id) ?? []), c])
       else {
         const key = normalizeName(c.name_raw) || c.id
@@ -312,7 +333,7 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   // above, and a booking she puts back already has its billing worked out.
   excluded.forEach((row, i) => bill(row, excludedNotes[i]))
 
-  return { date, rows, excluded, expenses, insurerPayments }
+  return { date, rows, excluded, expenses, otherIncome }
 }
 
 /** Rows that still need her attention before confirming. */

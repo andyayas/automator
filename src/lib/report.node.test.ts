@@ -49,6 +49,7 @@ const data: ReportData = {
     { label: 'Coffee', amount: 6 },
     { label: 'Water 5 boxes', amount: 12 },
   ],
+  otherIncome: [{ label: 'Test Insurer payment', amount: 900 }],
   totalClients: 17,
   packageNotPaid: 1,
 }
@@ -110,7 +111,14 @@ describe('buildReport', () => {
     expect(ws.getCell(`G${notPaid.slice(1)}`).value).toBe(1)
     const billed = ws.getCell(`G${find('Total Billed').slice(1)}`).value as { formula: string }
     expect(billed.formula).toMatch(/^C\d+\+C\d+\+C\d+$/)
-    const net = ws.getCell(`G${find('Net').slice(1)}`).value as { formula: string }
+    const net = ws.getCell(`G${find('Net').slice(1)}`).value as { formula: string; result: number }
     expect(net.formula).toMatch(/^G\d+-G\d+$/)
+    // Collected 5 + 0 + 14×45 = 635, plus other income 900, minus expenses 18.
+    expect(net.result).toBe(635 + 900 - 18)
+    const other = Number(find('Other Income').slice(1))
+    expect(ws.getCell(`A${other + 1}`).value).toBe('Test Insurer payment')
+    expect(ws.getCell(`C${other + 1}`).value).toBe(900)
+    const total = ws.getCell(`G${find('Income (total)').slice(1)}`).value as { result: number }
+    expect(total.result).toBe(635 + 900)
   })
 })
