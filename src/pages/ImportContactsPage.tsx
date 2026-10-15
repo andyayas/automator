@@ -37,7 +37,13 @@ export function ImportContactsPage() {
         noPhone: parsed.contacts.filter((c) => !c.phone).length,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const message = err instanceof Error ? err.message : String(err)
+      // Chrome: "Failed to fetch dynamically imported module"; Safari: "Importing a module script failed".
+      setError(
+        /dynamically imported module|module script failed/i.test(message)
+          ? 'The app was just updated. Reload the page, then choose the file again.'
+          : message,
+      )
       setStep({ kind: 'pick' })
     }
   }
