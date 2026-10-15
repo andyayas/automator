@@ -116,22 +116,37 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     )
   }
 
+  /** The Excel file for the current draft (nothing is saved here). */
+  async function makeReport(rowsForReport: DayRow[]) {
+    const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
+    const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+    return buildReport(templateBytes, toReportData(rowsForReport, expenses, packages.data ?? [], dateLabel))
+  }
+
+  async function onPreview() {
+    if (!final) return
+    setBusy('Building the preview…')
+    setError(null)
+    try {
+      downloadFile(await makeReport(final.rows), `Daily Report ${date} (preview).xlsx`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
   async function onConfirm() {
     if (!final || !draft) return
     setBusy('Saving the day…')
     setError(null)
     try {
       await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)))
-      {
-        setBusy('Filling the report…')
-        const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
-        const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-        const data = toReportData(final.rows, expenses, packages.data ?? [], dateLabel)
-        const bytes = await buildReport(templateBytes, data)
-        setBusy('Saving the report…')
-        await saveReport(date, bytes)
-        downloadFile(bytes, `Daily Report ${date}.xlsx`)
-      }
+      setBusy('Filling the report…')
+      const bytes = await makeReport(final.rows)
+      setBusy('Saving the report…')
+      await saveReport(date, bytes)
+      downloadFile(bytes, `Daily Report ${date}.xlsx`)
       storeEdits(date, null)
       setEdits(emptyEdits())
       await invalidate.day()
@@ -314,10 +329,15 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
           </Section>
 
           <div className="confirm-bar">
+            <button type="button" className="button block" disabled={Boolean(busy) || !rows.length} onClick={onPreview}>
+              Preview report
+            </button>
             <button type="button" className="button primary block" disabled={Boolean(busy) || !rows.length} onClick={onConfirm}>
               {busy ?? 'Confirm and generate report'}
             </button>
-            <p className="muted small center">Confirming takes these sessions off packages and approvals.</p>
+            <p className="muted small center">
+              Preview only downloads the file. Confirming saves the day and takes these sessions off packages and approvals.
+            </p>
           </div>
         </>
       )}

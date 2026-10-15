@@ -146,12 +146,13 @@ anything.
   auth.uid()` column and policies `using (owner_id = auth.uid())` /
   `with check (owner_id = auth.uid())`. No table without RLS. Public sign-ups are
   disabled in the Supabase dashboard, so she is the only user.
-- **The cash statement password is never stored in code or in the bundle.** She
-  types it at upload. Optionally it is remembered in her own browser's
-  localStorage behind a "remember on this device" checkbox. Vite inlines every
-  `VITE_*` env var into the public bundle, so the password must never be a
-  `VITE_` variable. For local tests it is `SAMPLE_CASH_PASSWORD` in `.env.local`,
-  read only by test code.
+- **The cash statement password is never stored in code or in the bundle.** It is
+  kept in her private `settings` row `cash_password` (RLS, her account only), so
+  uploads unlock by themselves on every device. The go-live seed writes it; if
+  it ever stops working she types the new one once and it is saved again. Vite
+  inlines every `VITE_*` env var into the public bundle, so the password must
+  never be a `VITE_` variable. For local tests it is `SAMPLE_CASH_PASSWORD` in
+  `.env.local`, read only by test code.
 - **The cash statement file never leaves the device.** Decrypt and parse in the
   browser, then send only the parsed transaction rows to Supabase.
 - Add an **"Export all data"** button (JSON + CSV download) as her own backup.

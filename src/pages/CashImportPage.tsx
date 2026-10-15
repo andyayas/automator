@@ -7,23 +7,17 @@ import { planCashImport, proposalStartDate, type CashImportPlan } from '../lib/c
 import { formatDate, formatMoney, plural, todayISO } from '../lib/format'
 import { createNameMatcher } from '../lib/names'
 import { useInvalidate } from '../lib/queries'
-import { fetchAllAliases } from '../lib/schedule-api'
+import { SETTING } from '../lib/defaults'
+import { fetchAllAliases, fetchSettings, saveSetting } from '../lib/schedule-api'
 
-// The password is only ever kept in this browser, and only if she ticks the box.
-const PASSWORD_KEY = 'clinic-admin.cash-password'
-const readSaved = () => {
+// The password lives in her private settings (only her login can read it), so
+// the file unlocks by itself on every device. It is never in the code.
+const LEGACY_KEY = 'clinic-admin.cash-password'
+const legacyPassword = () => {
   try {
-    return localStorage.getItem(PASSWORD_KEY) ?? ''
+    return localStorage.getItem(LEGACY_KEY) ?? ''
   } catch {
     return ''
-  }
-}
-const writeSaved = (value: string | null) => {
-  try {
-    if (value) localStorage.setItem(PASSWORD_KEY, value)
-    else localStorage.removeItem(PASSWORD_KEY)
-  } catch {
-    // Storage unavailable (private mode): nothing to remember.
   }
 }
 
@@ -40,8 +34,7 @@ export function CashImportPage() {
   const invalidate = useInvalidate()
   const [step, setStep] = useState<Step>({ kind: 'pick' })
   const [error, setError] = useState<string | null>(null)
-  const [password, setPassword] = useState(readSaved)
-  const [remember, setRemember] = useState(Boolean(readSaved()))
+  const [password, setPassword] = useState('')
 
   const fail = (err: unknown) => {
     const message = err instanceof Error ? err.message : String(err)
@@ -55,7 +48,8 @@ export function CashImportPage() {
     const loaded = { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
     const { isEncryptedOfficeFile } = await import('../lib/office-crypto')
     if (!isEncryptedOfficeFile(loaded.bytes)) return void read(loaded, null)
-    if (password) return void read(loaded, password)
+    const saved = ((await fetchSettings())[SETTING.cashPassword] as string | undefined) || legacyPassword()
+    if (saved) return void read(loaded, saved)
     setStep({ kind: 'password', file: loaded, wrong: false })
   }
 
@@ -74,13 +68,18 @@ export function CashImportPage() {
           bytes = await crypto.decryptOfficeFile(file.bytes, pw)
         } catch (err) {
           if (err instanceof crypto.WrongPasswordError) {
-            writeSaved(null)
             setPassword('')
             return setStep({ kind: 'password', file, wrong: true })
           }
           throw err
         }
-        writeSaved(remember ? pw : null)
+        // Remember it in her account, so she never has to type it again.
+        await saveSetting(SETTING.cashPassword, pw)
+        try {
+          localStorage.removeItem(LEGACY_KEY)
+        } catch {
+          // nothing stored
+        }
       }
       setStep({ kind: 'working', label: 'Reading the transactions…' })
       const insurers = [...(await fetchInsurers()), 'nextcare']
@@ -150,18 +149,19 @@ export function CashImportPage() {
           }}
         >
           <p className="strong">{step.file.name} is password-protected</p>
-          {step.wrong && (
+          <p className="muted small">
+            {step.wrong
+              ? 'The saved password no longer opens this file (it may have changed).'
+              : 'Type it once; the app remembers it in your account from then on.'}
+          </p>
+          {step.wrong && password === '' && (
             <p className="error" role="alert">
-              Wrong password. Try again.
+              Enter the current password.
             </p>
           )}
           <label className="field">
             <span>Password</span>
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" autoFocus />
-          </label>
-          <label className="check">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            <span>Remember on this device</span>
           </label>
           <button type="submit" className="button primary block" disabled={!password}>
             Unlock
@@ -237,19 +237,6 @@ export function CashImportPage() {
         </div>
       )}
 
-      {readSaved() && step.kind === 'pick' && (
-        <button
-          type="button"
-          className="button ghost"
-          onClick={() => {
-            writeSaved(null)
-            setPassword('')
-            setRemember(false)
-          }}
-        >
-          Forget the saved password on this device
-        </button>
-      )}
     </section>
   )
 }

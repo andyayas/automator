@@ -9,7 +9,8 @@
 //
 //   npm run seed                       dry run: writes samples/seed-report.md
 //   npm run seed -- --until=2026-10-14 count sessions up to this date (default: yesterday)
-//   npm run seed -- --apply            signs in as her and inserts the proposals
+//   npm run seed -- --apply            signs in as her, saves the cash statement
+//                                      password in her settings, inserts the proposals
 //
 // Everything it inserts is `proposed`: it counts for nothing until she accepts
 // it on the Today screen. Insurance approvals are not seeded (serial numbers
@@ -629,6 +630,11 @@ async function main() {
     console.error(`Sign-in failed: ${loginError.message}`)
     process.exit(1)
   }
+
+  // The cash statement password goes into her private settings, so the app
+  // unlocks uploads by itself (never into the code).
+  const { error: pwError } = await db.from('settings').upsert({ key: 'cash_password', value: password }, { onConflict: 'owner_id,key' })
+  if (pwError) throw pwError
 
   const clients: Array<{ id: string; name: string }> = []
   for (let from = 0; ; from += 1000) {

@@ -29,6 +29,8 @@ export const SETTING = {
   sheetLinks: 'sheet_links',
   perSessionPrice: 'per_session_price',
   insuranceBilled: 'insurance_billed',
+  /** The cash statement's file password, kept in her private settings (RLS), never in code. */
+  cashPassword: 'cash_password',
 } as const
 
 /** Used when a setting hasn't been set yet. */
