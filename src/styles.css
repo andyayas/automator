@@ -60,6 +60,10 @@ body {
   color: var(--text);
 }
 
+a {
+  color: var(--accent);
+}
+
 h1 {
   font-size: 1.5rem;
   line-height: 1.25;
@@ -1125,4 +1129,31 @@ details.card > summary {
 
 details.card[open] > summary {
   margin-bottom: 10px;
+}
+
+.day-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.day-sources.behind {
+  border-color: var(--warn);
+}
+
+.day-sources p {
+  margin: 0;
+}
+
+.source-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.schedule-source {
+  display: block;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }

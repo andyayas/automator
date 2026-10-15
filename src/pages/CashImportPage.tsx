@@ -1,32 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '../components/ui'
-import { fetchAllClients, fetchInsurers } from '../lib/api'
-import { applyCashImport, fetchPackageKeys, fetchStoredCash } from '../lib/cash-api'
-import { planCashImport, proposalStartDate, type CashImportPlan } from '../lib/cash-import'
-import { formatDate, formatMoney, plural, todayISO } from '../lib/format'
-import { createNameMatcher } from '../lib/names'
+import type { CashImportPlan } from '../lib/cash-import'
+import { PasswordNeeded, prepareCashUpload, saveCashUpload, type PreparedCash } from '../lib/cash-upload'
+import { formatDate, formatMoney, plural } from '../lib/format'
 import { useInvalidate } from '../lib/queries'
-import { SETTING } from '../lib/defaults'
-import { fetchAllAliases, fetchSettings, saveSetting } from '../lib/schedule-api'
-
-// The password lives in her private settings (only her login can read it), so
-// the file unlocks by itself on every device. It is never in the code.
-const LEGACY_KEY = 'clinic-admin.cash-password'
-const legacyPassword = () => {
-  try {
-    return localStorage.getItem(LEGACY_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
 
 type Loaded = { name: string; bytes: Uint8Array }
 type Step =
   | { kind: 'pick' }
   | { kind: 'password'; file: Loaded; wrong: boolean }
   | { kind: 'working'; label: string }
-  | { kind: 'preview'; fileName: string; plan: CashImportPlan; fixedDates: string[]; rows: number }
+  | ({ kind: 'preview' } & PreparedCash)
   | { kind: 'done'; plan: CashImportPlan }
 
 /** More → Upload cash statement. The file is decrypted and read on this device. */
@@ -45,68 +30,30 @@ export function CashImportPage() {
   async function onFile(file: File | undefined) {
     if (!file) return
     setError(null)
-    const loaded = { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }
-    const { isEncryptedOfficeFile } = await import('../lib/office-crypto')
-    if (!isEncryptedOfficeFile(loaded.bytes)) return void read(loaded, null)
-    const saved = ((await fetchSettings())[SETTING.cashPassword] as string | undefined) || legacyPassword()
-    if (saved) return void read(loaded, saved)
-    setStep({ kind: 'password', file: loaded, wrong: false })
+    void read({ name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) }, null)
   }
 
-  async function read(file: Loaded, pw: string | null) {
+  async function read(file: Loaded, typed: string | null) {
     setError(null)
+    setStep({ kind: 'working', label: 'Reading the file…' })
     try {
-      const [{ read: readXlsx }, crypto, { parseCashStatement }] = await Promise.all([
-        import('xlsx'),
-        import('../lib/office-crypto'),
-        import('../lib/cash-statement'),
-      ])
-      let bytes = file.bytes
-      if (pw !== null) {
-        setStep({ kind: 'working', label: 'Unlocking the file (a few seconds)…' })
-        try {
-          bytes = await crypto.decryptOfficeFile(file.bytes, pw)
-        } catch (err) {
-          if (err instanceof crypto.WrongPasswordError) {
-            setPassword('')
-            return setStep({ kind: 'password', file, wrong: true })
-          }
-          throw err
-        }
-        // Remember it in her account, so she never has to type it again.
-        await saveSetting(SETTING.cashPassword, pw)
-        try {
-          localStorage.removeItem(LEGACY_KEY)
-        } catch {
-          // nothing stored
-        }
-      }
-      setStep({ kind: 'working', label: 'Reading the transactions…' })
-      const insurers = [...(await fetchInsurers()), 'nextcare']
-      const parsed = parseCashStatement(readXlsx(bytes, { type: 'array', cellDates: true }), { insurers })
-      if (!parsed.rows.length) throw new Error('No transactions found. Is this the cash statement?')
-      const [clients, aliases, stored, packages] = await Promise.all([fetchAllClients(), fetchAllAliases(), fetchStoredCash(), fetchPackageKeys()])
-      const names = new Map(clients.map((c) => [c.id, c.name]))
-      const plan = planCashImport(
-        parsed.rows,
-        stored,
-        createNameMatcher(clients, aliases),
-        (id) => names.get(id) ?? id,
-        packages,
-        proposalStartDate(stored.map((s) => s.date), todayISO()),
-      )
-      setStep({ kind: 'preview', fileName: file.name, plan, fixedDates: parsed.fixedDates, rows: parsed.rows.length })
+      const prepared = await prepareCashUpload(file, typed, (label) => setStep({ kind: 'working', label }))
+      setStep({ kind: 'preview', ...prepared })
     } catch (err) {
+      if (err instanceof PasswordNeeded) {
+        setPassword('')
+        return setStep({ kind: 'password', file, wrong: err.wrong })
+      }
       fail(err)
     }
   }
 
-  async function onImport(fileName: string, plan: CashImportPlan, fixedDates: string[]) {
+  async function onImport(prepared: PreparedCash) {
     setStep({ kind: 'working', label: 'Saving…' })
     try {
-      await applyCashImport(plan, fileName, fixedDates)
-      await invalidate.balances()
-      setStep({ kind: 'done', plan })
+      await saveCashUpload(prepared)
+      await Promise.all([invalidate.balances(), invalidate.day()])
+      setStep({ kind: 'done', plan: prepared.plan })
     } catch (err) {
       fail(err)
     }
@@ -215,7 +162,7 @@ export function CashImportPage() {
           {step.fixedDates.length > 0 && (
             <p className="muted small">Date typos corrected: {step.fixedDates.join('; ')}</p>
           )}
-          <button type="button" className="button primary block" onClick={() => onImport(step.fileName, step.plan, step.fixedDates)}>
+          <button type="button" className="button primary block" onClick={() => onImport(step)}>
             Save
           </button>
           <button type="button" className="button ghost block" onClick={() => setStep({ kind: 'pick' })}>

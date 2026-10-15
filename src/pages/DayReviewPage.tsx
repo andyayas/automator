@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { useNavigate, useParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
-import { SheetRefresh } from '../components/SheetRefresh'
+import { DaySources } from '../components/DaySources'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
 import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, reopenDay, saveReport } from '../lib/day-api'
@@ -16,7 +16,6 @@ import {
   useDayReview,
   useExpenseLabels,
   useInvalidate,
-  useLatestCashDate,
   usePackages,
   useScheduleDay,
   useSettings,
@@ -57,7 +56,6 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const labels = useExpenseLabels()
   const settings = useSettings()
   const review = useDayReview(date)
-  const latestCash = useLatestCashDate()
   const invalidate = useInvalidate()
 
   const [edits, setEdits] = useState<DayEdits>(() => loadEdits(date))
@@ -187,7 +185,6 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     collected: rows.reduce((s, r) => s + r.collected, 0),
     expenses: expenses.reduce((s, e) => s + e.amount, 0),
   }
-  const cashBehind = latestCash.data !== undefined && (latestCash.data ?? '') < date && date <= todayISO()
 
   return (
     <section className="page">
@@ -209,20 +206,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
         />
       ) : (
         <>
-          {!entries.data!.length && (
-            <div className="card notice">
-              <p className="small">No schedule loaded for this day yet.</p>
-              <SheetRefresh date={date} />
-            </div>
-          )}
-          {cashBehind && (
-            <div className="card notice">
-              <p className="small">
-                The cash statement in the app ends on {formatDate(latestCash.data, { short: true }) || 'nothing yet'}.{' '}
-                <Link to="/more/cash">Upload the latest one</Link> so today’s payments are included.
-              </p>
-            </div>
-          )}
+          <DaySources date={date} />
+          {!entries.data!.length && <p className="muted small">No schedule loaded for this day yet: refresh it above.</p>}
 
           <div className="card day-summary">
             <div>
