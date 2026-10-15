@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import { BalanceCard } from '../../components/BalanceCard'
 import { Badge, Empty, ErrorCard, Loading, PageHeader, Section } from '../../components/ui'
-import { deleteAlias } from '../../lib/api'
+import { deleteAlias, linkNameVariant } from '../../lib/api'
 import { formatDate, formatMoney } from '../../lib/format'
+import { normalizeName } from '../../lib/names'
 import { formatPhone } from '../../lib/phone'
 import { useAliases, useApprovals, useClient, useClientSessions, useInvalidate, usePackages } from '../../lib/queries'
 
@@ -23,6 +24,21 @@ export function ClientDetailPage() {
   const sessions = useClientSessions(clientId)
   const invalidate = useInvalidate()
   const [aliasError, setAliasError] = useState<string | null>(null)
+  const [newAlias, setNewAlias] = useState('')
+
+  async function onAddAlias(event: FormEvent) {
+    event.preventDefault()
+    const alias = normalizeName(newAlias)
+    if (!alias) return
+    try {
+      setAliasError(null)
+      await linkNameVariant(clientId, alias)
+      setNewAlias('')
+      await invalidate.client(clientId)
+    } catch (err) {
+      setAliasError(err instanceof Error ? err.message : String(err))
+    }
+  }
 
   if (client.isPending) return <section className="page"><PageHeader title="Client" back="/clients" /><Loading /></section>
   if (client.isError) {
@@ -166,6 +182,19 @@ export function ClientDetailPage() {
         ) : (
           <Empty>None yet.</Empty>
         )}
+        <form className="inline-form" onSubmit={onAddAlias}>
+          <input
+            value={newAlias}
+            onChange={(e) => setNewAlias(e.target.value)}
+            placeholder="Another spelling, e.g. from the cash statement"
+            aria-label="Add a name variant"
+            autoCapitalize="none"
+            autoComplete="off"
+          />
+          <button type="submit" className="button" disabled={!newAlias.trim()}>
+            Add
+          </button>
+        </form>
       </Section>
     </section>
   )

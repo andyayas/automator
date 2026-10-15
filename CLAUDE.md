@@ -53,6 +53,14 @@ anything.
   `20261015120200_security_check.sql`.
 - The pre-commit hook (`.githooks/`, enabled by `npm install`) and CI both
   refuse `samples/`, spreadsheets and `.env*` files.
+- CI runs tests without Supabase env. Unit tests must not import
+  `src/lib/supabase.ts` (directly or via `api.ts`) unless they mock it. Check
+  locally with `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npm test`.
+- `npm run test:integration` runs the data layer against the live project as
+  RLS test user A (synthetic rows, cleaned up).
+- `npm run gen:types` regenerates `src/lib/database.types.ts` after migrations.
+- `npm run seed` (dry run) / `npm run seed -- --apply` is the go-live seed. It
+  writes `samples/seed-report.md` (real names, gitignored) and prints counts only.
 
 ### Manual setup checklist
 
@@ -141,13 +149,17 @@ Sample: `samples/September 2026.xlsx` (an export of the live sheet).
 - Rows 4–33: half-hour slots, `A4` = `7h00 am` … `A33` = `10h00 pm`.
 - Columns **C, E, G** are WhatsApp-reminder formulas. Ignore them.
 - Row 34 `Total Hrs of Sessions`; row 36 `Notes`.
-- A `Contacts` tab: column A name, column B phone (~3,000 rows). Use it as the
-  base client list, for fuzzy matching, and for reminder phone numbers. Phones
-  are stored as numbers that may read back as floats (`9613001272.0`). Convert
-  them to digit strings with no `+`, as `wa.me` expects. Most already start
-  with 961; add it when missing.
+- A `Contacts` tab: column A name, column B phone (~2,000 real rows, then
+  empty ones). Use it as the base client list, for fuzzy matching, and for
+  reminder phone numbers. Phones are stored as numbers that may read back as
+  floats (`9613001272.0`). Convert them to digit strings with no `+`, as
+  `wa.me` expects. Almost all already carry a country code, including ~40
+  foreign ones (971, 44, 974…), so only add 961 to short local numbers (7–8
+  digits, or 8 with a leading 0). See `src/lib/phone.ts`.
   Contacts is re-read on each schedule import. Phone fixes she makes in the app
-  win over Contacts.
+  win over Contacts. Contacts is **incomplete**: about a third of the distinct
+  names on the schedule aren't in it under any close spelling, so unmatched
+  names are normal and get fixed once via an alias.
 - Columns C/E/G currently build WhatsApp links with `REGEXEXTRACT` and an exact
   `VLOOKUP` against Contacts. They fail (`#N/A`) whenever the cell has a status
   letter, a session number, two names or a spelling variant. The app replaces
@@ -181,8 +193,10 @@ password comes from `.env.local`.
 
 - One tab per month (`January` … `September` in the sample, and `October` in the
   live file). Re-uploading the whole file must be safe, see "Import rules".
-- Row 3 headers. Row 6 holds the brought-forward balance in **J**.
-- From row 7, the columns are:
+- Row 3 headers. Row 6 holds the brought-forward balance in the balance column.
+- **Columns move between tabs**: January–June start one column further right
+  (Date in E) than July onwards (Date in D). Find them from the row-3 headers
+  (`src/lib/cash-statement.ts`). From row 7, the columns are (July layout):
   - **D** Date, filled on the first row of each day only (carry it down)
   - **E** Name (client, vendor, or insurer)
   - **F** Description
@@ -190,6 +204,14 @@ password comes from `.env.local`.
   - **H** Debit $ (money in)
   - **I** Credit $ (money out)
   - **J** Running balance formula
+- **Voucher numbers are recycled** (receipt books run rc1…rc100 and restart),
+  so a voucher is not unique. Rows are keyed by date + voucher, or a content
+  key when there is no voucher (`source_key`).
+- Repeated header rows (`Description`) and `Total` lines are not transactions.
+  A few dates are text (`15-sep-26`).
+- Packages are sometimes paid in instalments (`first payment …`, `last payment
+  of the package`), by card (`paid by card`), or by Wish Money transfer
+  (`… wish`).
 - **A–B** are LBP columns. **K–M** contain ad-hoc scratch notes; ignore them.
 - **POS payments** have no H/I value. The amount is only in the description
   (`single physio session 45$ POS`, `Package of 12 session POS 450$`). Parse it
@@ -260,11 +282,19 @@ synthetic padding block. Verify against the sample with `msoffcrypto-tool`
 
 Sample: `samples/Daily Report September 2026.xlsx`. One tab per day (`Tue Sep 22`).
 
-- Client table at `A12:F53`: Client Name, Therapist, Info, Amount Paid, Amount
-  Billed, Notes. Info is mostly `Insurance`, `Package`, `Cash`, `Free`, or
-  `POS 45$`.
-- Expenses at `H12:I21`.
-- Reconciliation at `H23:I27`, where Opening = previous day's `I27`.
+The layout moves from day to day, so find sections by their labels
+(`src/lib/old-daily-report.ts`):
+- Client table: header row `Client Name` (row 11), rows below it until the first
+  blank row or a `Maintenance Follow-Up` heading. Columns: Client Name,
+  Therapist, Info, Amount Paid, Amount Billed, Notes. Info is mostly
+  `Insurance`, `Package`, `Cash`, `Free`, or `POS 45$`.
+- Some days have a `Maintenance Follow-Up` section below (name + call note).
+  It is not part of the day's clients.
+- Expenses: `Expense Details` header at `H11`, amounts in `I`.
+- Reconciliation: under `Cash Reconciliation` (row 23–27 depending on the day):
+  Opening Balance, Collected, Expenses, Closing Balance.
+
+There are also 6 October days (1–7 Oct); she stopped making them after that.
 
 These 23 hand-made days are the **ground truth for testing** the matching logic.
 They also seed: which clients are on packages or insurance, their usual billed
@@ -287,6 +317,10 @@ anchored at A1.
 | Net | `E57:F59` | Income, Expenses, Net |
 
 Only write values into the data rows. Keep existing formulas and styles.
+
+**Extra Note** is empty by default. The old reports had a remark for every
+client ("client is satisfied…"); the new template doesn't. She types a note by
+hand only when there is something extra, so never copy the old remarks over.
 
 Known template issues (open questions below):
 - `F54` (Package Not Paid) has no formula.
@@ -322,18 +356,24 @@ Known template issues (open questions below):
 Every table has `id`, `owner_id` (default `auth.uid()`, RLS), `created_at`, and
 `updated_at`.
 
-- `clients`: name, phone, notes, active
+- `clients`: name, phone_contacts (from Contacts), phone_override (her fix),
+  phone (generated: override, else Contacts), contacts_key (normalized
+  Contacts name, so re-imports update the same client), notes, active
 - `client_aliases`: client_id, alias (normalized, unique)
 - `packages`: client_id, sessions_total, price_total, per_session, purchased_on,
   source_voucher, sessions_used_before_app (for packages already part-used at
-  go-live), status (proposed/active/finished/cancelled)
+  go-live), used_before_app_as_of (the date that count runs to), status
+  (proposed/active/finished/cancelled)
 - `insurance_approvals`: client_id, insurer, serial_number, sessions_approved,
   billed_per_session, copay_per_session, approved_on, valid_until,
-  sessions_used_before_app, status (proposed/active/finished/cancelled)
+  sessions_used_before_app, used_before_app_as_of, status
+- Views `package_balances` / `approval_balances` (security_invoker): each row
+  plus sessions_used_in_app, sessions_used, sessions_remaining, last_session_on.
 
 `proposed` rows come from auto-detection or the seed script and count for
 nothing until she accepts them.
-- `cash_transactions`: date, name_raw, description, voucher (unique per owner),
+- `cash_transactions`: date, name_raw, description, voucher, source_key
+  (unique per owner; see "Voucher numbers are recycled"),
   debit, credit, method (cash/pos), pos_amount, kind
   (session/package/insurance_copay/insurer_payment/expense/other), client_id,
   import_id
@@ -348,17 +388,19 @@ nothing until she accepts them.
   (unique on date + slot_time + client_id)
 - `imports`: kind (cash/schedule), filename, imported_at, rows_added,
   rows_changed
-- `settings`: staff names, non-client patterns, expense label mappings,
-  default rates, reminder message template, clinic Google Sheet ID(s) per month
+- `settings`: key → JSON for single values: staff names, default rates,
+  reminder message template, sender name, clinic Google Sheet ID(s) per month
+- `non_client_patterns`: pattern, match_type (exact/contains)
+- `expense_labels`: match_key (`name|description`), label
 
 Sessions remaining is **derived** (total − sessions_used_before_app − confirmed
 uses), never stored as a counter, so corrections stay consistent.
 
 ### Import rules
 
-- Cash: upsert by `voucher`. A changed amount or name on an existing voucher
-  updates the row and is shown in the import summary. Unchanged rows are a
-  no-op. Vouchers that disappear are flagged, not deleted.
+- Cash: upsert by `source_key`. A changed amount or name on an existing row
+  updates it and is shown in the import summary. Unchanged rows are a no-op.
+  Rows that disappear are flagged (`missing_from_source`), not deleted.
 - Schedule: replace that date's entries on each import, unless the day is
   already confirmed. In that case show the differences instead.
 
@@ -367,12 +409,12 @@ uses), never stored as a counter, so corrections stay consistent.
 Each phase ends with something she can use. Run tests against `samples/`
 locally before calling a phase done.
 
-1. **Foundation**: Vite app, hash router, login screen (email + password), and a
+1. **Foundation** *(done 2026-10-15)*: Vite app, hash router, login screen (email + password), and a
    mobile layout with bottom navigation (Today, Schedule, Clients, Reminders,
    More). Screens can be placeholders until their phase. Supabase migrations with RLS on every
    table. GitHub Actions deploy to Pages. *Done when* she can log in on her phone
    and a second test account cannot read her rows.
-2. **Packages and insurance**: seed `clients` (with phones) from the Contacts
+2. **Packages and insurance** *(built 2026-10-15; go-live seed run pending)*: seed `clients` (with phones) from the Contacts
    tab of an uploaded schedule export. Then build client search, add/edit
    package and add/edit approval, including "sessions already used" for ones
    that started before the app. Dashboard: active packages and approvals with

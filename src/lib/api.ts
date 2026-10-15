@@ -73,6 +73,13 @@ export async function deleteAlias(id: string) {
   fail(error)
 }
 
+/** Links a spelling she typed to this client. */
+export async function linkNameVariant(clientId: string, alias: string) {
+  const { error } = await supabase.from('client_aliases').insert({ client_id: clientId, alias })
+  if (error?.code === '23505') throw new Error('That spelling is already linked to a client.')
+  fail(error)
+}
+
 /** Saves a name variant for a client; ignores it if the variant already exists. */
 export async function addAlias(clientId: string, alias: string) {
   const { error } = await supabase
