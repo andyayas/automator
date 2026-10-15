@@ -12,8 +12,13 @@ export function MorePage() {
 
       <div className="card list">
         <Link to="/more/import-contacts" className="list-row link">
-          <span>Import clients</span>
-          <span className="muted">From the schedule's Contacts tab ›</span>
+          <span className="row-text">
+            <span>Import clients</span>
+            <span className="muted small">From the schedule's Contacts tab</span>
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
         </Link>
         <div className="list-row">
           <span>Settings</span>
