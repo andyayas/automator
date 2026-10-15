@@ -304,20 +304,6 @@ These 23 hand-made days are the **ground truth for testing** the matching logic.
 They also seed: which clients are on packages or insurance, their usual billed
 rate (package rate is typically about 38, insurance 25), and name aliases.
 
-### 5. Her monthly Statement of Account (history only)
-
-Sample: `samples/Statement of Account SEP 2026.xlsx`. Two tabs.
-- `Statement of Account`: `Period: 1 – 30 September 2026` line, account
-  summary, one row per day (Billed, Collected, Expenses, Balance), sessions by
-  type, collected by source, expenses by category, insurance sessions by client
-  (Client, Therapist, Sessions, Billed), and a **`Package Sessions`** table
-  (Client, Package, Used in <month>, Remaining).
-- `Active Clients`: client name and therapist(s) for the month.
-
-**Package Sessions "Remaining" is her own count** and is the most trusted
-source for how many sessions a package has left at the end of that month. The
-go-live seed uses it ahead of schedule session numbers and file counts.
-
 ### 4. New daily report template (output format)
 
 Sample: `samples/Daily Report Template.xlsx`. In production it is stored in the
@@ -345,6 +331,20 @@ Known template issues (open questions below):
 - `F48` uses `SUMPRODUCT(...unique names...)-6`, which is fragile.
 - There's no Therapist column.
 - Section capacity may overflow on busy days.
+
+### 5. Her monthly Statement of Account (history only)
+
+Sample: `samples/Statement of Account SEP 2026.xlsx`. Two tabs.
+- `Statement of Account`: `Period: 1 – 30 September 2026` line, account
+  summary, one row per day (Billed, Collected, Expenses, Balance), sessions by
+  type, collected by source, expenses by category, insurance sessions by client
+  (Client, Therapist, Sessions, Billed), and a **`Package Sessions`** table
+  (Client, Package, Used in <month>, Remaining).
+- `Active Clients`: client name and therapist(s) for the month.
+
+**Package Sessions "Remaining" is her own count** and is the most trusted
+source for how many sessions a package has left at the end of that month. The
+go-live seed uses it ahead of schedule session numbers and file counts.
 
 ## Domain rules
 
