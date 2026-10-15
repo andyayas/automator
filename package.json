@@ -19,7 +19,8 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "gen:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts",
     "test:integration": "INTEGRATION=1 vitest run src/lib/api.integration.test.ts",
-    "seed": "tsx --env-file=.env.local scripts/seed-golive.ts"
+    "seed": "tsx --env-file=.env.local scripts/seed-golive.ts",
+    "check:names": "tsx scripts/scan-real-names.ts --all"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",

@@ -53,6 +53,10 @@ anything.
   `20261015120200_security_check.sql`.
 - The pre-commit hook (`.githooks/`, enabled by `npm install`) and CI both
   refuse `samples/`, spreadsheets and `.env*` files.
+- The pre-commit hook also runs `scripts/scan-real-names.ts` when `samples/`
+  exists: it blocks any staged line containing a real client name (from
+  Contacts, the schedule or the old reports). `npm run check:names` scans every
+  tracked file. Don't rely on ad-hoc scans chained after `&&`.
 - CI runs tests without Supabase env. Unit tests must not import
   `src/lib/supabase.ts` (directly or via `api.ts`) unless they mock it. Check
   locally with `VITE_SUPABASE_URL= VITE_SUPABASE_ANON_KEY= npm test`.
