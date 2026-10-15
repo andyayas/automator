@@ -85,6 +85,13 @@ anything.
 - [x] GitHub Pages source = GitHub Actions (set via `gh api`).
 - [x] GitHub Actions variables `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
       (set via `gh variable set`).
+- [x] Google Cloud project "Clinic Admin": Sheets API enabled, OAuth client
+      (Web) with origins `https://andyayas.github.io` and
+      `http://localhost:5173`, scope `spreadsheets.readonly`, Testing mode.
+      Client ID in `.env.local` and the `VITE_GOOGLE_CLIENT_ID` repo variable.
+- [ ] Google Auth Platform → Audience → Test users: the account(s) that open
+      the clinic sheet (hers and/or the clinic's).
+- [ ] Settings in the app: sender name, and each month's sheet link.
 
 ## Principles
 
@@ -453,7 +460,7 @@ locally before calling a phase done.
    inserts open packages, with sessions used so far, as `proposed` for her to
    accept or fix. Insurance approvals can't be fully seeded, because serial
    numbers aren't in any file, so she enters those by hand.
-3. **Schedule, reminders and imports** *(a, c, d, e built 2026-10-15 on branch `phase-3`; b waits for the Google Cloud setup)*. Build in this order:
+3. **Schedule, reminders and imports** *(built 2026-10-15 on branch `phase-3`, not deployed yet)*. Build in this order:
    (a) **Schedule parser + upload** from the exported xlsx, tested against
    `samples/September 2026.xlsx`. Each import refreshes phones from Contacts.
    (b) **Live Google Sheet read** via Google sign-in. Same parser, different
