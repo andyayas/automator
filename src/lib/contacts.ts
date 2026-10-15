@@ -1,5 +1,5 @@
 import type { WorkBook } from 'xlsx'
-import { utils } from 'xlsx'
+import { sheetRows } from './sheet-rows'
 import { displayName, normalizeName } from './names'
 import { normalizePhone } from './phone'
 
@@ -22,7 +22,7 @@ export type ContactsParseResult = {
 export function parseContacts(workbook: WorkBook): ContactsParseResult {
   const sheetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === 'contacts')
   if (!sheetName) throw new Error('This file has no "Contacts" tab. Upload the schedule export.')
-  const rows = utils.sheet_to_json<unknown[]>(workbook.Sheets[sheetName], { header: 1, blankrows: false, raw: true })
+  const rows = sheetRows(workbook.Sheets[sheetName])
 
   const byKey = new Map<string, ContactRow>()
   let duplicates = 0

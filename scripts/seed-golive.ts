@@ -20,10 +20,11 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
-import { read, utils, type WorkBook } from 'xlsx'
+import { read, type WorkBook } from 'xlsx'
 import type { Database } from '../src/lib/database.types.ts'
 import { amountReceived, parseCashStatement, toISODate, type CashRow } from '../src/lib/cash-statement.ts'
 import { parseContacts } from '../src/lib/contacts.ts'
+import { sheetRows } from '../src/lib/sheet-rows.ts'
 import { createNameMatcher, displayName, FUZZY_THRESHOLD, normalizeName, tokenSortRatio, type NameMatch } from '../src/lib/names.ts'
 import { decryptOfficeFile } from '../src/lib/office-crypto.ts'
 import { parseOldDailyReports, type OldReportRow } from '../src/lib/old-daily-report.ts'
@@ -65,7 +66,7 @@ function readSchedule(file: string): Booking[] {
   const bookings: Booking[] = []
   for (const tab of wb.SheetNames) {
     if (tab.trim().toLowerCase() === 'contacts') continue
-    const rows = utils.sheet_to_json<unknown[]>(wb.Sheets[tab], { header: 1, blankrows: true, raw: true, defval: null })
+    const rows = sheetRows(wb.Sheets[tab])
     const date = toISODate(rows[0]?.[8])
     if (!date) continue
     const therapists = [1, 3, 5].map((c) => String(rows[2]?.[c] ?? '').trim())
@@ -86,7 +87,7 @@ type StatementRow = { name: string; size: number; remaining: number; asOf: strin
 function readStatement(file: string): StatementRow[] {
   const wb = read(readFileSync(file), { type: 'buffer' })
   const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows = utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: true, raw: true, defval: null })
+  const rows = sheetRows(ws)
   const period = rows.flat().map(String).find((v) => /^period:/i.test(v)) ?? ''
   const m = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*$/.exec(period)
   const month = m ? MONTHS.findIndex((x) => x.toLowerCase().startsWith(m[2].toLowerCase().slice(0, 3))) : -1

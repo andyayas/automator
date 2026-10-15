@@ -8,8 +8,9 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { read, utils } from 'xlsx'
+import { read } from 'xlsx'
 import { parseContacts } from '../src/lib/contacts.ts'
+import { sheetRows } from '../src/lib/sheet-rows.ts'
 import { normalizeName } from '../src/lib/names.ts'
 import { parseOldDailyReports } from '../src/lib/old-daily-report.ts'
 import { DEFAULT_NON_CLIENT_PATTERNS, isNonClient, parseScheduleCell } from '../src/lib/schedule-cell.ts'
@@ -30,7 +31,7 @@ for (const file of readdirSync(SAMPLES).filter((f) => f.endsWith('.xlsx') && !f.
   if (wb.SheetNames.some((n) => n.trim().toLowerCase() === 'contacts')) {
     for (const c of parseContacts(wb).contacts) add(c.name)
     for (const tab of wb.SheetNames) {
-      const rows = utils.sheet_to_json<unknown[]>(wb.Sheets[tab], { header: 1, blankrows: true, raw: true, defval: null })
+      const rows = sheetRows(wb.Sheets[tab])
       for (let r = 3; r <= 32; r++)
         for (const c of [1, 3, 5]) {
           const cell = parseScheduleCell(rows[r]?.[c])

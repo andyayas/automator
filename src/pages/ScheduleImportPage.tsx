@@ -44,8 +44,9 @@ export function ScheduleImportPage() {
     setError(null)
     setStep({ kind: 'working', label: 'Reading the file…' })
     try {
-      const [{ read, utils }, { parseContacts }, { parseScheduleGrids }] = await Promise.all([
+      const [{ read }, { sheetRows }, { parseContacts }, { parseScheduleGrids }] = await Promise.all([
         import('xlsx'),
+        import('../lib/sheet-rows'),
         import('../lib/contacts'),
         import('../lib/schedule'),
       ])
@@ -54,7 +55,7 @@ export function ScheduleImportPage() {
       const workbook = read(await file.arrayBuffer(), { type: 'array', cellDates: true })
       const grids = workbook.SheetNames.map((name) => ({
         name,
-        rows: utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, blankrows: true, raw: true, defval: null }),
+        rows: sheetRows(workbook.Sheets[name]),
       }))
       const staffNames = (settings[SETTING.staffNames] as string[] | undefined) ?? []
       const days = parseScheduleGrids(grids, {

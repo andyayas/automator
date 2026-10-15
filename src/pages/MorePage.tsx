@@ -20,6 +20,15 @@ export function MorePage() {
             ›
           </span>
         </Link>
+        <Link to="/more/cash" className="list-row link">
+          <span className="row-text">
+            <span>Upload cash statement</span>
+            <span className="muted small">Read on this device; only the rows are saved</span>
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
+        </Link>
         <Link to="/more/settings" className="list-row link">
           <span className="row-text">
             <span>Settings</span>

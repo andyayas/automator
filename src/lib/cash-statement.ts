@@ -3,7 +3,7 @@
 // (January–June start one column further right than July onwards).
 
 import type { WorkBook } from 'xlsx'
-import { utils } from 'xlsx'
+import { sheetRows } from './sheet-rows'
 import { toISODate } from './dates'
 import { normalizeName } from './names'
 
@@ -61,7 +61,7 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
   const sheets: string[] = []
 
   for (const sheet of workbook.SheetNames) {
-    const data = utils.sheet_to_json<unknown[]>(workbook.Sheets[sheet], { header: 1, blankrows: true, raw: true, defval: null })
+    const data = sheetRows(workbook.Sheets[sheet])
     const cols = findColumns(data)
     if (!cols) continue
     sheets.push(sheet)

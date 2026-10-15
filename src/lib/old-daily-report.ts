@@ -6,7 +6,7 @@
 // template's Extra Note is left for her to fill in by hand).
 
 import type { WorkBook } from 'xlsx'
-import { utils } from 'xlsx'
+import { sheetRows } from './sheet-rows'
 import { normalizeName } from './names'
 
 export type OldInfo = 'insurance' | 'package' | 'cash' | 'free' | 'pos' | 'blank' | 'other'
@@ -33,7 +33,7 @@ export function parseOldDailyReports(workbook: WorkBook, year: number): OldRepor
     if (!m || month < 0) continue
     const date = `${year}-${String(month + 1).padStart(2, '0')}-${m[2].padStart(2, '0')}`
 
-    const data = utils.sheet_to_json<unknown[]>(workbook.Sheets[tab], { header: 1, blankrows: true, raw: true, defval: null })
+    const data = sheetRows(workbook.Sheets[tab])
     const header = data.findIndex((r) => normalizeName(r?.[0]) === 'client name')
     if (header < 0) continue
 

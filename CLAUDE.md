@@ -425,6 +425,12 @@ uses), never stored as a counter, so corrections stay consistent.
   Rows that disappear are flagged (`missing_from_source`), not deleted.
 - Schedule: replace that date's entries on each import, unless the day is
   already confirmed. In that case show the differences instead.
+- Package proposals from cash uploads: only receipts dated after the newest
+  receipt already stored (first upload: the last 14 days). Older receipts are
+  history that the go-live seed covered; proposing them would flood Today.
+- Read every sheet with `sheetRows()` (`src/lib/sheet-rows.ts`): SheetJS
+  otherwise starts at the first used cell, which shifts fixed row/column rules
+  when a sheet's first rows or columns are empty.
 
 ## Phases
 
@@ -447,7 +453,7 @@ locally before calling a phase done.
    inserts open packages, with sessions used so far, as `proposed` for her to
    accept or fix. Insurance approvals can't be fully seeded, because serial
    numbers aren't in any file, so she enters those by hand.
-3. **Schedule, reminders and imports**. Build in this order:
+3. **Schedule, reminders and imports** *(a, c, d, e built 2026-10-15 on branch `phase-3`; b waits for the Google Cloud setup)*. Build in this order:
    (a) **Schedule parser + upload** from the exported xlsx, tested against
    `samples/September 2026.xlsx`. Each import refreshes phones from Contacts.
    (b) **Live Google Sheet read** via Google sign-in. Same parser, different
