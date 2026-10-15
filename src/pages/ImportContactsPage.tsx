@@ -5,6 +5,7 @@ import { applyContactsImport, fetchAllClients } from '../lib/api'
 import { planContactsImport, type ContactsPlan } from '../lib/contacts-plan'
 import { plural } from '../lib/format'
 import { useInvalidate } from '../lib/queries'
+import { fetchAllAliases } from '../lib/schedule-api'
 
 type Step =
   | { kind: 'pick' }
@@ -35,7 +36,8 @@ export function ImportContactsPage() {
         const [{ read }, { parseContacts }] = await Promise.all([import('xlsx'), import('../lib/contacts-xlsx')])
         parsed = parseContacts(read(await file.arrayBuffer(), { type: 'array' }))
       }
-      const plan = planContactsImport(parsed.contacts, await fetchAllClients(), isVcard ? 'phone' : 'sheet')
+      const [clients, aliases] = await Promise.all([fetchAllClients(), fetchAllAliases()])
+      const plan = planContactsImport(parsed.contacts, clients, isVcard ? 'phone' : 'sheet', aliases)
       setStep({
         kind: 'preview',
         plan,

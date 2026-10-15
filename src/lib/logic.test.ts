@@ -219,3 +219,17 @@ describe('planContactsImport from a phone export', () => {
     expect(plan.inserts.map((c) => c.key)).toEqual(['brand new'])
   })
 })
+
+describe('planContactsImport with saved spellings', () => {
+  it('treats a contact under a saved spelling as that client, not a new one', () => {
+    const clients = [{ id: 'f', name: 'Fady Testoon', contacts_key: null, phone_contacts: null, phone_override: null, phone: null }] as Client[]
+    const plan = planContactsImport(
+      [{ key: 'fadi testoun', name: 'Fadi Testoun', phone: '96171555666' }],
+      clients,
+      'phone',
+      new Map([['fadi testoun', 'f']]),
+    )
+    expect(plan.inserts).toEqual([])
+    expect(plan.phoneUpdates).toEqual([{ client: clients[0], phone: '96171555666', contactsKey: 'fadi testoun' }])
+  })
+})

@@ -37,7 +37,8 @@ export async function runScheduleImport(
   let contactsAdded = 0
   let phonesUpdated = 0
   if (input.contacts) {
-    const contactsPlan = planContactsImport(input.contacts, await fetchAllClients())
+    const [clients, aliases] = await Promise.all([fetchAllClients(), fetchAllAliases()])
+    const contactsPlan = planContactsImport(input.contacts, clients, 'sheet', aliases)
     if (contactsPlan.inserts.length + contactsPlan.phoneUpdates.length + contactsPlan.phoneOverrides.length) {
       onStep('Refreshing phones from Contacts…')
       await applyContactsImport(contactsPlan)

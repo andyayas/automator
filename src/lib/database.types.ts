@@ -771,6 +771,10 @@ export type Database = {
       }
     }
     Functions: {
+      merge_clients: {
+        Args: { keep_id: string; remove_alias: string; remove_id: string }
+        Returns: undefined
+      }
       table_security_report: {
         Args: never
         Returns: {

@@ -62,6 +62,16 @@ export async function updateClient(id: string, changes: TablesUpdate<'clients'>)
   fail(error)
 }
 
+/**
+ * Merges a duplicate into the client she keeps: packages, approvals, sessions,
+ * bookings, payments, reminders and spellings move over, the duplicate's name
+ * becomes a spelling, its phone fills in a missing one, then it is deleted.
+ */
+export async function mergeClients(keepId: string, removeId: string, removeAlias: string) {
+  const { error } = await supabase.rpc('merge_clients', { keep_id: keepId, remove_id: removeId, remove_alias: removeAlias })
+  fail(error)
+}
+
 export async function fetchAliases(clientId: string): Promise<ClientAlias[]> {
   const { data, error } = await supabase.from('client_aliases').select('*').eq('client_id', clientId).order('alias')
   fail(error)

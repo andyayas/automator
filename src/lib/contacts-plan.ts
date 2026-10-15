@@ -29,7 +29,13 @@ export type ContactsPlan = {
  * phone's number is the newer one, and it is careful about duplicates (same
  * number under another name, or a near-identical name, is not added again).
  */
-export function planContactsImport(contacts: ContactRow[], existing: Client[], source: ContactsSource = 'sheet'): ContactsPlan {
+export function planContactsImport(
+  contacts: ContactRow[],
+  existing: Client[],
+  source: ContactsSource = 'sheet',
+  /** Saved spellings (normalized alias -> client id): a contact under one of them is that client. */
+  aliases: Map<string, string> = new Map(),
+): ContactsPlan {
   const byKey = new Map(existing.filter((c) => c.contacts_key).map((c) => [c.contacts_key!, c]))
   const byName = new Map<string, Client>()
   for (const c of existing) {
@@ -39,12 +45,15 @@ export function planContactsImport(contacts: ContactRow[], existing: Client[], s
   const byPhone = new Map(existing.filter((c) => c.phone).map((c) => [c.phone!, c]))
   const match = source === 'phone' ? createNameMatcher(existing.map((c) => ({ id: c.id, name: c.name }))) : null
   const nameOf = new Map(existing.map((c) => [c.id, c.name]))
+  const byId = new Map(existing.map((c) => [c.id, c]))
 
   const plan: ContactsPlan = { inserts: [], phoneUpdates: [], phoneOverrides: [], aliases: [], skipped: [], unchanged: 0 }
   const linked = new Set<string>()
 
   for (const row of contacts) {
-    const client = byKey.get(row.key) ?? (byName.get(row.key) && !linked.has(byName.get(row.key)!.id) ? byName.get(row.key) : undefined)
+    const named = byName.get(row.key)
+    const aliased = aliases.has(row.key) ? byId.get(aliases.get(row.key)!) : undefined
+    const client = byKey.get(row.key) ?? (named && !linked.has(named.id) ? named : undefined) ?? (aliased && !linked.has(aliased.id) ? aliased : undefined)
     if (client) {
       linked.add(client.id)
       const link = client.contacts_key ? undefined : row.key
