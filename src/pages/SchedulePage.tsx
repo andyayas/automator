@@ -2,13 +2,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DateNav, LinkClientDialog, StatusChip } from '../components/schedule-ui'
+import { SheetRefresh } from '../components/SheetRefresh'
 import { Badge, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { activeByClient, bookingContext, type ActiveByClient } from '../lib/booking-context'
 import { SETTING } from '../lib/defaults'
 import { todayISO } from '../lib/format'
 import { useApprovals, usePackages, useScheduleDay, useSettings } from '../lib/queries'
 import { formatSlotTime } from '../lib/schedule'
-import { fetchScheduleImportTime, type ScheduleEntry } from '../lib/schedule-api'
+import { tabUrl } from '../lib/google-sheets'
+import { fetchScheduleImport, type ScheduleEntry } from '../lib/schedule-api'
 
 export function SchedulePage() {
   const [params, setParams] = useSearchParams()
@@ -21,14 +23,16 @@ export function SchedulePage() {
 
   const importId = entries.data?.find((e) => e.import_id)?.import_id ?? null
   const refreshed = useQuery({
-    queryKey: ['import-time', importId],
-    queryFn: () => fetchScheduleImportTime(importId!),
+    queryKey: ['import', importId],
+    queryFn: () => fetchScheduleImport(importId!),
     enabled: Boolean(importId),
   })
 
   const active = useMemo(() => activeByClient(packages.data ?? [], approvals.data ?? []), [packages.data, approvals.data])
   const sheetLinks = (settings.data?.[SETTING.sheetLinks] ?? {}) as Record<string, string>
-  const sheetUrl = sheetLinks[date.slice(0, 7)]
+  const monthSheet = sheetLinks[date.slice(0, 7)]
+  const tab = entries.data?.find((e) => e.sheet_tab)?.sheet_tab
+  const sheetUrl = monthSheet ? tabUrl(monthSheet, tab ? refreshed.data?.gids[tab] : undefined) : null
 
   const list = entries.data ?? []
   const bookings = list.filter((e) => !e.is_non_client)
@@ -46,11 +50,12 @@ export function SchedulePage() {
         }
       />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
+      <SheetRefresh date={date} />
 
       <div className="schedule-meta">
         <span className="muted small">
           {refreshed.data
-            ? `Updated ${new Date(refreshed.data).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+            ? `Updated ${new Date(refreshed.data.importedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${refreshed.data.source?.startsWith('Google Sheet') ? ' from the sheet' : ' from a file'}`
             : list.length
               ? ''
               : 'Not loaded yet'}

@@ -1,28 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '../components/ui'
-import { applyContactsImport, fetchAllClients } from '../lib/api'
-import { planContactsImport, type ContactsPlan } from '../lib/contacts-plan'
-import { SETTING } from '../lib/defaults'
+import type { ContactRow } from '../lib/contacts'
 import { formatDate, plural } from '../lib/format'
-import { createNameMatcher } from '../lib/names'
 import { useInvalidate } from '../lib/queries'
 import type { ScheduleDay } from '../lib/schedule'
-import {
-  applyScheduleImport,
-  ensureDefaults,
-  fetchAllAliases,
-  fetchConfirmedDates,
-  fetchPatterns,
-  fetchSettings,
-  fetchStoredBookings,
-} from '../lib/schedule-api'
-import { planScheduleImport, type ScheduleImportPlan } from '../lib/schedule-import'
+import type { ScheduleImportPlan } from '../lib/schedule-import'
+import { loadParseOptions, runScheduleImport } from '../lib/schedule-run'
 
 type Step =
   | { kind: 'pick' }
   | { kind: 'working'; label: string }
-  | { kind: 'preview'; fileName: string; days: ScheduleDay[]; contacts: ContactsPlan | null }
+  | { kind: 'preview'; fileName: string; days: ScheduleDay[]; contacts: ContactRow[] | null }
   | { kind: 'done'; plan: ScheduleImportPlan; contactsAdded: number; firstDate: string | null }
 
 const RELOAD_HINT = /dynamically imported module|module script failed/i
@@ -47,48 +36,30 @@ export function ScheduleImportPage() {
       const [{ read }, { sheetRows }, { parseContacts }, { parseScheduleGrids }] = await Promise.all([
         import('xlsx'),
         import('../lib/sheet-rows'),
-        import('../lib/contacts'),
+        import('../lib/contacts-xlsx'),
         import('../lib/schedule'),
       ])
-      await ensureDefaults()
-      const [patterns, settings] = await Promise.all([fetchPatterns(), fetchSettings()])
+      const options = await loadParseOptions()
       const workbook = read(await file.arrayBuffer(), { type: 'array', cellDates: true })
-      const grids = workbook.SheetNames.map((name) => ({
-        name,
-        rows: sheetRows(workbook.Sheets[name]),
-      }))
-      const staffNames = (settings[SETTING.staffNames] as string[] | undefined) ?? []
-      const days = parseScheduleGrids(grids, {
-        patterns: patterns.map((p) => ({ pattern: p.pattern, match_type: p.match_type as 'exact' | 'contains' })),
-        staffNames,
-      })
+      const days = parseScheduleGrids(
+        workbook.SheetNames.map((name) => ({ name, rows: sheetRows(workbook.Sheets[name]) })),
+        options,
+      )
       if (!days.length) throw new Error('No schedule days found. Is this the schedule export (one tab per day, date in I1)?')
       const hasContacts = workbook.SheetNames.some((n) => n.trim().toLowerCase() === 'contacts')
-      const contacts = hasContacts ? planContactsImport(parseContacts(workbook).contacts, await fetchAllClients()) : null
+      const contacts = hasContacts ? parseContacts(workbook).contacts : null
       setStep({ kind: 'preview', fileName: file.name, days, contacts })
     } catch (err) {
       fail(err)
     }
   }
 
-  async function onImport(fileName: string, days: ScheduleDay[], contacts: ContactsPlan | null) {
+  async function onImport(fileName: string, days: ScheduleDay[], contacts: ContactRow[] | null) {
     setError(null)
     try {
-      let contactsAdded = 0
-      if (contacts && contacts.inserts.length + contacts.phoneUpdates.length) {
-        setStep({ kind: 'working', label: 'Refreshing phones from Contacts…' })
-        await applyContactsImport(contacts)
-        contactsAdded = contacts.inserts.length
-      }
-      setStep({ kind: 'working', label: 'Matching names…' })
-      const [clients, aliases] = await Promise.all([fetchAllClients(), fetchAllAliases()])
-      const dates = days.map((d) => d.date)
-      const [confirmed, stored] = await Promise.all([fetchConfirmedDates(dates), fetchStoredBookings(dates)])
-      const plan = planScheduleImport(days, createNameMatcher(clients, aliases), confirmed, stored)
-      setStep({ kind: 'working', label: 'Saving…' })
-      await applyScheduleImport(plan, fileName)
+      const result = await runScheduleImport({ days, contacts, source: fileName }, (label) => setStep({ kind: 'working', label }))
       await Promise.all([invalidate.schedule(), invalidate.clients()])
-      setStep({ kind: 'done', plan, contactsAdded, firstDate: dates[0] ?? null })
+      setStep({ kind: 'done', plan: result.plan, contactsAdded: result.contactsAdded, firstDate: days[0]?.date ?? null })
     } catch (err) {
       fail(err)
     }
@@ -133,11 +104,7 @@ export function ScheduleImportPage() {
               {formatDate(step.days.at(-1)!.date, { short: true })}
             </li>
             <li>{plural(step.days.reduce((n, d) => n + d.rows.filter((r) => !r.isNonClient).length, 0), 'booking')}</li>
-            {step.contacts && (
-              <li>
-                Contacts: {plural(step.contacts.inserts.length, 'new client')}, {plural(step.contacts.phoneUpdates.length, 'phone update')}
-              </li>
-            )}
+            {step.contacts && <li>Contacts tab: {plural(step.contacts.length, 'contact')} (phones are refreshed)</li>}
           </ul>
           <button type="button" className="button primary block" onClick={() => onImport(step.fileName, step.days, step.contacts)}>
             Import

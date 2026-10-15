@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DateNav, LinkClientDialog, StatusChip } from '../components/schedule-ui'
+import { SheetRefresh } from '../components/SheetRefresh'
 import { Badge, Empty, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { updateClient } from '../lib/api'
 import { SETTING } from '../lib/defaults'
@@ -52,6 +53,7 @@ export function RemindersPage() {
     <section className="page">
       <PageHeader title="Reminders" />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
+      <SheetRefresh date={date} />
 
       {settings.data && !senderName && (
         <div className="card notice">

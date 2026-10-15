@@ -1,5 +1,3 @@
-import type { WorkBook } from 'xlsx'
-import { sheetRows } from './sheet-rows'
 import { displayName, normalizeName } from './names'
 import { normalizePhone } from './phone'
 
@@ -18,12 +16,8 @@ export type ContactsParseResult = {
   invalidPhones: number
 }
 
-/** Reads the Contacts tab of a schedule export: column A name, column B phone. */
-export function parseContacts(workbook: WorkBook): ContactsParseResult {
-  const sheetName = workbook.SheetNames.find((n) => n.trim().toLowerCase() === 'contacts')
-  if (!sheetName) throw new Error('This file has no "Contacts" tab. Upload the schedule export.')
-  const rows = sheetRows(workbook.Sheets[sheetName])
-
+/** Reads Contacts rows (column A name, column B phone), from a file or the live sheet. */
+export function parseContactsRows(rows: unknown[][]): ContactsParseResult {
   const byKey = new Map<string, ContactRow>()
   let duplicates = 0
   let invalidPhones = 0

@@ -1033,3 +1033,13 @@ progress {
 .warn-text {
   color: var(--warn);
 }
+
+.sheet-refresh {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sheet-refresh p {
+  margin: 0;
+}

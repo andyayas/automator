@@ -25,7 +25,7 @@ export function ImportContactsPage() {
     setStep({ kind: 'reading' })
     try {
       // Excel parsing is only loaded on this screen.
-      const [{ read }, { parseContacts }] = await Promise.all([import('xlsx'), import('../lib/contacts')])
+      const [{ read }, { parseContacts }] = await Promise.all([import('xlsx'), import('../lib/contacts-xlsx')])
       const workbook = read(await file.arrayBuffer(), { type: 'array' })
       const parsed = parseContacts(workbook)
       const plan = planContactsImport(parsed.contacts, await fetchAllClients())

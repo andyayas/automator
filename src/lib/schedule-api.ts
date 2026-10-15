@@ -31,11 +31,13 @@ export async function fetchScheduleDay(date: string): Promise<ScheduleEntry[]> {
   return data as unknown as ScheduleEntry[]
 }
 
-/** When the schedule for this date was last refreshed. */
-export async function fetchScheduleImportTime(importId: string): Promise<string | null> {
-  const { data, error } = await supabase.from('imports').select('imported_at').eq('id', importId).maybeSingle()
+/** When the schedule for this date was last refreshed, from where, and the sheet's tab ids. */
+export async function fetchScheduleImport(importId: string) {
+  const { data, error } = await supabase.from('imports').select('imported_at, filename, details').eq('id', importId).maybeSingle()
   fail(error)
-  return data?.imported_at ?? null
+  if (!data) return null
+  const details = (data.details ?? {}) as { gids?: Record<string, number> }
+  return { importedAt: data.imported_at, source: data.filename, gids: details.gids ?? {} }
 }
 
 export async function fetchAllAliases(): Promise<Map<string, string>> {
@@ -65,7 +67,7 @@ export async function fetchStoredBookings(dates: string[]): Promise<Map<string, 
 }
 
 /** Replaces each day's entries (never a confirmed day; the plan already excludes those). */
-export async function applyScheduleImport(plan: ScheduleImportPlan, source: string) {
+export async function applyScheduleImport(plan: ScheduleImportPlan, source: string, extra: Record<string, Json> = {}) {
   const dates = [...plan.replace.keys()]
   const rows = [...plan.replace.values()].flat()
   const { data: imp, error: impError } = await supabase
@@ -79,6 +81,7 @@ export async function applyScheduleImport(plan: ScheduleImportPlan, source: stri
         unmatched: plan.unmatched,
         uncertain: plan.uncertain,
         confirmed_days_changed: plan.confirmedChanged,
+        ...extra,
       } as unknown as Json,
     })
     .select('id')

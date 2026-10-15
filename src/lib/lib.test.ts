@@ -1,7 +1,7 @@
 // Synthetic names only.
 import { describe, expect, it } from 'vitest'
 import { utils } from 'xlsx'
-import { parseContacts } from './contacts'
+import { parseContacts } from './contacts-xlsx'
 import { createNameMatcher, displayName, normalizeName, tokenSortRatio } from './names'
 import { formatPhone, normalizePhone } from './phone'
 
