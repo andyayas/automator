@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
-import { fetchRecentReviews } from '../lib/day-api'
-import { todayISO } from '../lib/format'
+import { fetchMonth, fetchRecentReviews } from '../lib/day-api'
+import { formatDate, todayISO } from '../lib/format'
 import { Badge } from './ui'
 
 /** The last working day before today (the clinic is closed on Sundays). */
@@ -17,7 +17,11 @@ export function DailyReviewCard() {
   const today = todayISO()
   const dates = [previousWorkingDay(today), today]
   const reviews = useQuery({ queryKey: ['day-review', 'recent', ...dates], queryFn: () => fetchRecentReviews(dates) })
+  // Earlier days this month with bookings that are not confirmed yet.
+  const month = useQuery({ queryKey: ['day-review', 'month', today.slice(0, 7)], queryFn: () => fetchMonth(today.slice(0, 7), today) })
+  const earlier = (month.data?.notConfirmed ?? []).filter((d) => !dates.includes(d))
   return (
+    <>
     <div className="card list">
       {dates.map((date, i) => {
         const r = reviews.data?.find((x) => x.date === date)
@@ -36,5 +40,17 @@ export function DailyReviewCard() {
         )
       })}
     </div>
+    {earlier.length > 0 && (
+      <p className="muted small">
+        Earlier days not confirmed yet:{' '}
+        {earlier.map((d, i) => (
+          <span key={d}>
+            {i ? ', ' : ''}
+            <Link to={`/day/${d}`}>{formatDate(d, { short: true })}</Link>
+          </span>
+        ))}
+      </p>
+    )}
+    </>
   )
 }

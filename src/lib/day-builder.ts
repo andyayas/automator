@@ -136,6 +136,9 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   const activeApprovals = (id: string) => input.approvals.filter((a) => a.client_id === id && a.status === 'active')
   const proposedPackage = (id: string) => input.packages.some((p) => p.client_id === id && p.status === 'proposed')
 
+  /** Days up to "counted up to" are already in "sessions already used". */
+  const alreadyCounted = (asOf: string | null) => Boolean(asOf && date <= asOf)
+
   // Sessions taken today per package / approval, so two sessions get n+1, n+2.
   const usedToday = new Map<string, number>()
   const cashUsed = new Set<string>()
@@ -175,13 +178,18 @@ export function buildDayDraft(input: DayInputs): DayDraft {
         row.flags.push({ kind: 'no-approval', text: 'Insurance, but no active approval' })
         return
       }
-      const n = usedToday.get(ap.id) ?? 0
-      usedToday.set(ap.id, n + 1)
       row.approvalId = ap.id
       row.serialNumber = ap.serial_number
       row.billed = Number(ap.billed_per_session ?? defaults.insuranceBilled)
-      row.sessionNo = ap.sessions_used + n + 1
-      if (ap.sessions_remaining - n <= 0) row.flags.push({ kind: 'exhausted', text: 'Approval has no sessions left' })
+      if (alreadyCounted(ap.used_before_app_as_of)) {
+        // Covered by "sessions already used": history, not counted again.
+        row.sessionNo = row.sheetSessionNo
+      } else {
+        const n = usedToday.get(ap.id) ?? 0
+        usedToday.set(ap.id, n + 1)
+        row.sessionNo = ap.sessions_used + n + 1
+        if (ap.sessions_remaining - n <= 0) row.flags.push({ kind: 'exhausted', text: 'Approval has no sessions left' })
+      }
       if (ap.valid_until && ap.valid_until < date) row.flags.push({ kind: 'expired', text: `Approval expired ${ap.valid_until}` })
     } else if (row.billingType === 'package') {
       const pk = pkgs.find((p) => p.sessions_remaining - (usedToday.get(p.id) ?? 0) > 0) ?? pkgs.at(-1)
@@ -194,12 +202,17 @@ export function buildDayDraft(input: DayInputs): DayDraft {
         )
         return
       }
-      const n = usedToday.get(pk.id) ?? 0
-      usedToday.set(pk.id, n + 1)
       row.packageId = pk.id
       row.billed = Number(pk.per_session)
-      row.sessionNo = pk.sessions_used + n + 1
-      if (pk.sessions_remaining - n <= 0) row.flags.push({ kind: 'exhausted', text: 'Package has no sessions left' })
+      if (alreadyCounted(pk.used_before_app_as_of)) {
+        // Covered by "sessions already used": history, not counted again.
+        row.sessionNo = row.sheetSessionNo
+      } else {
+        const n = usedToday.get(pk.id) ?? 0
+        usedToday.set(pk.id, n + 1)
+        row.sessionNo = pk.sessions_used + n + 1
+        if (pk.sessions_remaining - n <= 0) row.flags.push({ kind: 'exhausted', text: 'Package has no sessions left' })
+      }
     } else if (row.billingType === 'per_session') {
       row.billed = row.collected > 0 ? row.collected : defaults.perSessionPrice
       if (row.collected <= 0) row.flags.push({ kind: 'not-paid', text: 'Came, but no payment in the cash statement' })

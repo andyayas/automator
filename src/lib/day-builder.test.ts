@@ -276,3 +276,13 @@ describe('monthReportDays', () => {
     expect(days[0].data.totalClients).toBe(1)
   })
 })
+
+describe('days already covered by "sessions already used"', () => {
+  it('bills the package but takes the session number from the sheet and flags nothing', () => {
+    const covered = { ...pkg('p1', 'omar', 10), used_before_app_as_of: '2026-10-14' }
+    const past = buildDayDraft(inputs({ date: '2026-10-09', entries: [entry({ client_id: 'omar', session_no: 6 })], packages: [covered] }))
+    expect(past.rows[0]).toMatchObject({ billingType: 'package', packageId: 'p1', sessionNo: 6, flags: [] })
+    const after = buildDayDraft(inputs({ date: '2026-10-15', entries: [entry({ client_id: 'omar' })], packages: [covered] }))
+    expect(after.rows[0].flags.map((f) => f.kind)).toEqual(['exhausted'])
+  })
+})

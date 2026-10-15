@@ -6,6 +6,13 @@ export function todayISO(now = new Date()): string {
   return `${y}-${m}-${d}`
 }
 
+/** Yesterday in the device's time zone, as YYYY-MM-DD. */
+export function yesterdayISO(now = new Date()): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() - 1)
+  return todayISO(d)
+}
+
 /** Whole days from `from` to `to` (both YYYY-MM-DD). */
 export function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000)

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { deletePackage, savePackage, type PackageWithBalance, type Status } from '../../lib/api'
-import { numberText, parseNumber, perSessionValue, todayISO } from '../../lib/format'
+import { numberText, parseNumber, perSessionValue, todayISO, yesterdayISO } from '../../lib/format'
 import { useClient, useInvalidate, usePackage } from '../../lib/queries'
 import { Field, SessionsSummary, StatusSelect, UsedBeforeFields } from './form-parts'
 
@@ -28,7 +28,7 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
   const [voucher, setVoucher] = useState(pkg?.source_voucher ?? '')
   const [paid, setPaid] = useState(numberText(pkg?.amount_paid))
   const [used, setUsed] = useState(numberText(pkg?.sessions_used_before_app ?? 0))
-  const [asOf, setAsOf] = useState(pkg?.used_before_app_as_of ?? todayISO())
+  const [asOf, setAsOf] = useState(pkg?.used_before_app_as_of ?? yesterdayISO())
   const [status, setStatus] = useState<Status>(pkg?.status ?? 'active')
   const [notes, setNotes] = useState(pkg?.notes ?? '')
   const [error, setError] = useState<string | null>(null)

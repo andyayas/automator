@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { deleteApproval, saveApproval, type ApprovalWithBalance, type Status } from '../../lib/api'
-import { numberText, parseNumber, todayISO } from '../../lib/format'
+import { numberText, parseNumber, todayISO, yesterdayISO } from '../../lib/format'
 import { DEFAULT_PRICES, SETTING } from '../../lib/defaults'
 import { useApproval, useClient, useInsurers, useInvalidate, useSettings } from '../../lib/queries'
 import { Field, SessionsSummary, StatusSelect, UsedBeforeFields } from './form-parts'
@@ -33,7 +33,7 @@ function ApprovalForm({ approval, clientId }: { approval?: ApprovalWithBalance; 
   const [approvedOn, setApprovedOn] = useState(approval?.approved_on ?? todayISO())
   const [validUntil, setValidUntil] = useState(approval?.valid_until ?? '')
   const [used, setUsed] = useState(numberText(approval?.sessions_used_before_app ?? 0))
-  const [asOf, setAsOf] = useState(approval?.used_before_app_as_of ?? todayISO())
+  const [asOf, setAsOf] = useState(approval?.used_before_app_as_of ?? yesterdayISO())
   const [status, setStatus] = useState<Status>(approval?.status ?? 'active')
   const [notes, setNotes] = useState(approval?.notes ?? '')
   const [error, setError] = useState<string | null>(null)

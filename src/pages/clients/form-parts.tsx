@@ -49,7 +49,7 @@ export function UsedBeforeFields(props: {
         <input inputMode="numeric" value={props.used} onChange={(e) => props.onUsed(e.target.value)} />
       </Field>
       {showAsOf && (
-        <Field label="Counted up to">
+        <Field label="Counted up to (including)">
           <input type="date" value={props.asOf} onChange={(e) => props.onAsOf(e.target.value)} />
         </Field>
       )}
