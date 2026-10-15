@@ -1,4 +1,5 @@
 import react from '@vitejs/plugin-react'
+import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 // GitHub Pages serves the app from https://andyayas.github.io/automator/.
@@ -13,5 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // Integration tests hit the live project; only `npm run test:integration` runs them.
+    exclude: process.env.INTEGRATION ? ['node_modules/**'] : ['node_modules/**', 'src/**/*.integration.test.ts'],
+    // Test-only logins from .env.local; never VITE_-prefixed, so never in the bundle.
+    env: process.env.INTEGRATION ? loadEnv('test', process.cwd(), 'RLS_TEST_') : {},
   },
 })

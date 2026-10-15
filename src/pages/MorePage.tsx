@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '../auth/auth-context'
 
 export function MorePage() {
@@ -10,6 +11,10 @@ export function MorePage() {
       <h1>More</h1>
 
       <div className="card list">
+        <Link to="/more/import-contacts" className="list-row link">
+          <span>Import clients</span>
+          <span className="muted">From the schedule's Contacts tab ›</span>
+        </Link>
         <div className="list-row">
           <span>Settings</span>
           <span className="muted">Coming soon</span>

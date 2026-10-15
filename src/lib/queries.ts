@@ -1,0 +1,58 @@
+import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
+import * as api from './api'
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: true },
+  },
+})
+
+export const keys = {
+  clients: ['clients'] as const,
+  client: (id: string) => ['clients', id] as const,
+  aliases: (clientId: string) => ['aliases', clientId] as const,
+  sessions: (clientId: string) => ['sessions', clientId] as const,
+  packages: ['packages'] as const,
+  package: (id: string) => ['packages', 'one', id] as const,
+  approvals: ['approvals'] as const,
+  approval: (id: string) => ['approvals', 'one', id] as const,
+  insurers: ['insurers'] as const,
+}
+
+export const useClients = () =>
+  useQuery({ queryKey: keys.clients, queryFn: api.fetchAllClients, staleTime: 5 * 60_000 })
+export const useClient = (id: string) =>
+  useQuery({ queryKey: keys.client(id), queryFn: () => api.fetchClient(id), enabled: Boolean(id) })
+export const useAliases = (clientId: string) =>
+  useQuery({ queryKey: keys.aliases(clientId), queryFn: () => api.fetchAliases(clientId) })
+export const useClientSessions = (clientId: string) =>
+  useQuery({ queryKey: keys.sessions(clientId), queryFn: () => api.fetchClientSessions(clientId) })
+
+/** Every package and approval with its balance; screens filter in memory (a few hundred rows at most). */
+export const usePackages = () => useQuery({ queryKey: keys.packages, queryFn: () => api.fetchPackages() })
+export const useApprovals = () => useQuery({ queryKey: keys.approvals, queryFn: () => api.fetchApprovals() })
+export const usePackage = (id: string) =>
+  useQuery({ queryKey: keys.package(id), queryFn: () => api.fetchPackage(id), enabled: Boolean(id) })
+export const useApproval = (id: string) =>
+  useQuery({ queryKey: keys.approval(id), queryFn: () => api.fetchApproval(id), enabled: Boolean(id) })
+export const useInsurers = () => useQuery({ queryKey: keys.insurers, queryFn: api.fetchInsurers })
+
+/** Refetch everything that shows packages or approvals after a change. */
+export function useInvalidate() {
+  const client = useQueryClient()
+  return {
+    balances: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: keys.packages }),
+        client.invalidateQueries({ queryKey: keys.approvals }),
+        client.invalidateQueries({ queryKey: keys.insurers }),
+      ]),
+    clients: () => client.invalidateQueries({ queryKey: keys.clients }),
+    client: (id: string) =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: keys.client(id) }),
+        client.invalidateQueries({ queryKey: keys.aliases(id) }),
+        client.invalidateQueries({ queryKey: keys.clients, exact: true }),
+      ]),
+  }
+}

@@ -29,6 +29,12 @@ const TAG = `rls-check-${Date.now()}`
 const DAY = '2000-01-01'
 const BUCKET = 'private'
 
+// Views must run with the caller's RLS; each is checked against B's fixture rows.
+const VIEWS: Array<{ view: string; idOf: string }> = [
+  { view: 'package_balances', idOf: 'packages' },
+  { view: 'approval_balances', idOf: 'insurance_approvals' },
+]
+
 // One fixture per table, in dependency order. A table in the database that is
 // missing here makes the check fail, so new tables can't skip the test.
 const FIXTURES: Array<{ table: string; row: (ids: Ids) => Row }> = [
@@ -52,7 +58,8 @@ const FIXTURES: Array<{ table: string; row: (ids: Ids) => Row }> = [
     table: 'cash_transactions',
     row: (ids) => ({
       date: DAY,
-      voucher: `${TAG}-rc1`,
+      voucher: 'rc1',
+      source_key: `${TAG}|rc1`,
       debit: 45,
       client_id: ids.clients,
       import_id: ids.imports,
@@ -127,13 +134,16 @@ async function main() {
     // --- Every table in the database is covered and locked down -------------
     const report = await a.db.rpc('table_security_report')
     check(!report.error, 'security report readable by a signed-in user', report.error?.message)
-    const tables = (report.data ?? []) as Array<{
+    const relations = (report.data ?? []) as Array<{
       table_name: string
+      kind: 'table' | 'view'
       rls_enabled: boolean
       policy_count: number
       has_owner_id: boolean
+      security_invoker: boolean
       anon_has_access: boolean
     }>
+    const tables = relations.filter((r) => r.kind === 'table')
     const covered = new Set(FIXTURES.map((f) => f.table))
     for (const t of tables) {
       check(covered.has(t.table_name), `${t.table_name}: has a fixture in rls-check.ts`)
@@ -141,6 +151,14 @@ async function main() {
         t.rls_enabled && t.policy_count > 0 && t.has_owner_id && !t.anon_has_access,
         `${t.table_name}: RLS on, policies present, owner_id column, no anon privileges`,
         JSON.stringify(t),
+      )
+    }
+    for (const v of relations.filter((r) => r.kind === 'view')) {
+      check(VIEWS.some((x) => x.view === v.table_name), `${v.table_name}: view is covered in rls-check.ts`)
+      check(
+        v.security_invoker && v.has_owner_id && !v.anon_has_access,
+        `${v.table_name}: view uses security_invoker, has owner_id, no anon privileges`,
+        JSON.stringify(v),
       )
     }
     for (const f of FIXTURES) {
@@ -187,6 +205,18 @@ async function main() {
       const anonIns = await anon.from(f.table).insert(f.row(ids))
       check(anonIns.error?.code === '42501', `${f.table}: anonymous cannot insert`, anonIns.error?.code)
     }
+
+    // --- Views apply the caller's RLS -----------------------------------------
+    for (const { view, idOf } of VIEWS) {
+      const own = await b.db.from(view).select('id').eq('id', ids[idOf])
+      check(own.data?.length === 1, `${view}: owner sees own balance`, own.error?.message)
+      const other = await a.db.from(view).select('id').eq('id', ids[idOf])
+      check(!other.error && other.data?.length === 0, `${view}: other user cannot read`, other.error?.message)
+      const anonView = await anon.from(view).select('id').eq('id', ids[idOf])
+      check(!!anonView.error || anonView.data?.length === 0, `${view}: anonymous cannot read`)
+    }
+    const balance = await b.db.from('package_balances').select('sessions_remaining').eq('id', ids.packages).single()
+    check(balance.data?.sessions_remaining === 12, 'unconfirmed day sessions do not deduct', JSON.stringify(balance.data))
 
     // --- A cannot link its own rows to B's rows ------------------------------
     const own = await a.db.from('clients').insert({ name: `${TAG} A client` }).select('id').single()
