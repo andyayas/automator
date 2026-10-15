@@ -1,6 +1,12 @@
 // Go-live seed: proposes the packages that are still open, with sessions used
 // so far, from the files in samples/. Local only, never deployed.
 //
+// Sources, most trusted first:
+//   1. Her monthly "Statement of Account" (Package Sessions table): her own
+//      count of sessions remaining at the end of the month.
+//   2. Session numbers written on the schedule ("Name 9 C").
+//   3. Counting package rows in the daily reports, then the schedule's C marks.
+//
 //   npm run seed                       dry run: writes samples/seed-report.md
 //   npm run seed -- --until=2026-10-14 count sessions up to this date (default: yesterday)
 //   npm run seed -- --apply            signs in as her and inserts the proposals
@@ -74,6 +80,32 @@ function readSchedule(file: string): Booking[] {
   return bookings
 }
 
+type StatementRow = { name: string; size: number; remaining: number; asOf: string; file: string }
+
+/** "Package Sessions" table of her monthly statement: Client, Package, Used in <month>, Remaining. */
+function readStatement(file: string): StatementRow[] {
+  const wb = read(readFileSync(file), { type: 'buffer' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows = utils.sheet_to_json<unknown[]>(ws, { header: 1, blankrows: true, raw: true, defval: null })
+  const period = rows.flat().map(String).find((v) => /^period:/i.test(v)) ?? ''
+  const m = /(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})\s*$/.exec(period)
+  const month = m ? MONTHS.findIndex((x) => x.toLowerCase().startsWith(m[2].toLowerCase().slice(0, 3))) : -1
+  if (!m || month < 0) {
+    console.warn(`Skipping ${file}: no "Period: … <day> <Month> <year>" line found.`)
+    return []
+  }
+  const asOf = `${m[3]}-${String(month + 1).padStart(2, '0')}-${m[1].padStart(2, '0')}`
+  const start = rows.findIndex((r) => String(r[0] ?? '').trim().toLowerCase() === 'package sessions')
+  if (start < 0) return []
+  const out: StatementRow[] = []
+  for (let i = start + 2; i < rows.length; i++) {
+    const [name, size, , , remaining] = [rows[i][0], rows[i][1], rows[i][2], rows[i][3], rows[i][4]]
+    if (!name || String(name).trim().toUpperCase() === 'TOTAL') break
+    if (typeof size === 'number' && typeof remaining === 'number') out.push({ name: String(name).trim(), size, remaining, asOf, file })
+  }
+  return out
+}
+
 const latestSchedule: WorkBook = read(readFileSync(scheduleFiles.at(-1)!), { type: 'buffer' })
 const contacts = parseContacts(latestSchedule).contacts
 const bookings = scheduleFiles.flatMap(readSchedule)
@@ -81,6 +113,8 @@ const reportRows: OldReportRow[] = reportFiles.flatMap((f) => {
   const year = Number(/(\d{4})\.xlsx$/.exec(f)![1])
   return parseOldDailyReports(read(readFileSync(f), { type: 'buffer' }), year).flatMap((d) => d.rows)
 })
+const statementFiles = samplesMatching(/^Statement of Account .*\.xlsx$/)
+const statementRows = statementFiles.flatMap(readStatement)
 const lastReportDate = reportRows.map((r) => r.date).sort().at(-1) ?? '0000-00-00'
 const firstDataDate = [...reportRows.map((r) => r.date), ...bookings.map((b) => b.date)].sort()[0]
 
@@ -94,10 +128,11 @@ type Proposal = {
   cashName: string
   sessionsTotal: number
   priceTotal: number
-  purchasedOn: string
+  purchasedOn: string | null
   voucher: string | null
   used: number
   usedKnown: boolean
+  fromStatement: boolean
   notes: string[]
 }
 
@@ -108,6 +143,7 @@ type Plan = {
   unmatchedPayers: Array<{ name: string; detail: string; active: boolean }>
   ambiguous: Array<{ name: string; detail: string }>
   packageWithoutPurchase: Array<{ name: string; detail: string }>
+  unmatchedStatement: Array<{ name: string; detail: string }>
   insurance: Array<{ name: string; detail: string }>
 }
 
@@ -125,7 +161,16 @@ function buildPlan(
     }
     return best.score >= 0.6 ? `; closest client: "${best.name}" (${Math.round(best.score * 100)}%)` : '; no close client'
   }
-  const plan: Plan = { proposals: [], finished: [], dormant: [], unmatchedPayers: [], ambiguous: [], packageWithoutPurchase: [], insurance: [] }
+  const plan: Plan = {
+    proposals: [],
+    finished: [],
+    dormant: [],
+    unmatchedPayers: [],
+    ambiguous: [],
+    packageWithoutPurchase: [],
+    unmatchedStatement: [],
+    insurance: [],
+  }
   const idFor = (raw: string) => {
     const m = match(raw)
     return m.kind === 'none' ? null : m.id
@@ -174,57 +219,147 @@ function buildPlan(
     plan.unmatchedPayers.push({ name: latest.nameRaw, detail, active: seen > 0 })
   }
 
-  for (const [clientId, rows] of byClient) {
-    const purchases = rows.filter((r) => r.packageSessions).sort((a, b) => a.date.localeCompare(b.date))
-    const latest = purchases.at(-1)
-    if (!latest) continue // only instalment rows; reported below via packageWithoutPurchase if used
-    const N = latest.packageSessions!
-    const instalments = rows.filter(
-      (r) => r !== latest && !r.packageSessions && r.date >= latest.date && daysBetween(latest.date, r.date) <= INSTALMENT_WINDOW_DAYS,
-    )
-    const notes: string[] = []
-    let price = amountReceived(latest)
-    if (instalments.length) {
-      price += instalments.reduce((s, r) => s + amountReceived(r), 0)
-      notes.push(`price includes ${instalments.length} later payment(s): ${instalments.map((r) => `${r.voucher ?? r.date} $${amountReceived(r)}`).join(', ')}`)
-    }
-    if (/first payment|1st payment/i.test(latest.description) && !instalments.length) notes.push('only a first payment was found; check the price')
-    if (/paid by/i.test(latest.description)) notes.push(`"${latest.description}" (someone else paid)`)
-    if (latest.method !== 'cash') notes.push(`paid by ${latest.method === 'pos' ? 'card/POS' : 'transfer'}`)
+  /** Package sessions for a client after a date (exclusive), up to --until. */
+  const sessionsAfter = (clientId: string, after: string) => {
+    const evs = (events.get(clientId) ?? []).filter((e) => e.date > after)
+    for (const b of confirmedAfterReports) if (b.date > after && idFor(b.name) === clientId) evs.push({ date: b.date, source: 'schedule' })
+    return evs.sort((a, b) => a.date.localeCompare(b.date))
+  }
 
-    const evs = (events.get(clientId) ?? []).filter((e) => e.date >= latest.date)
-    for (const b of confirmedAfterReports) if (idFor(b.name) === clientId && b.date >= latest.date) evs.push({ date: b.date, source: 'schedule' })
-    evs.sort((a, b) => a.date.localeCompare(b.date))
-
-    // Anchor: the latest session number written on the schedule since the purchase.
+  /** Sessions used on a purchase, worked out from the files alone. */
+  const fromFiles = (clientId: string, purchase: CashRow) => {
+    const N = purchase.packageSessions!
+    const dayBefore = addDays(purchase.date, -1)
+    const evs = sessionsAfter(clientId, dayBefore)
     const anchor = (bookingsById.get(clientId) ?? [])
-      .filter((b) => b.status === 'confirmed' && b.sessionNo && b.sessionNo <= N && b.date >= latest.date && b.date <= until)
+      .filter((b) => b.status === 'confirmed' && b.sessionNo && b.sessionNo <= N && b.date >= purchase.date && b.date <= until)
       .sort((a, b) => a.date.localeCompare(b.date))
       .at(-1)
-    const counted = evs.length
+    const notes: string[] = []
     let used: number
     let usedKnown = true
     if (anchor) {
       const after = evs.filter((e) => e.date > anchor.date).length
       used = anchor.sessionNo! + after
       notes.push(`schedule shows session ${anchor.sessionNo} on ${anchor.date}${after ? `, plus ${after} after` : ''}`)
-      if (latest.date >= firstDataDate && counted !== used) notes.push(`counting the files instead gives ${counted}; check`)
-    } else if (latest.date >= firstDataDate) {
-      used = counted
-      notes.push(`${counted} package session(s) counted since purchase`)
+      if (purchase.date >= firstDataDate && evs.length !== used) notes.push(`counting the files instead gives ${evs.length}; check`)
+    } else if (purchase.date >= firstDataDate) {
+      used = evs.length
+      notes.push(`${evs.length} package session(s) counted since purchase`)
     } else {
-      used = counted
+      used = evs.length
       usedKnown = false
-      notes.push(`bought ${latest.date}, before the files start (${firstDataDate}); at least ${counted} used since then`)
+      notes.push(`bought ${purchase.date}, before the files start (${firstDataDate}); at least ${evs.length} used since then`)
     }
     if (evs.some((e) => e.source === 'schedule')) notes.push(`sessions after ${lastReportDate} are from the schedule's C (confirmed) marks`)
+    return { used, usedKnown, counted: evs.length, notes }
+  }
 
-    const detail = `package of ${N} bought ${latest.date} (${latest.voucher ?? 'no voucher'}), ${used} used`
-    if (used >= N) {
-      plan.finished.push({ name: nameOf(clientId), detail })
+  /** Price of a purchase, including later instalments. */
+  const priceOf = (purchase: CashRow, rows: CashRow[]) => {
+    const instalments = rows.filter(
+      (r) => r !== purchase && !r.packageSessions && r.date >= purchase.date && daysBetween(purchase.date, r.date) <= INSTALMENT_WINDOW_DAYS,
+    )
+    const notes: string[] = []
+    let price = amountReceived(purchase)
+    if (instalments.length) {
+      price += instalments.reduce((sum, r) => sum + amountReceived(r), 0)
+      notes.push(`price includes ${instalments.length} later payment(s): ${instalments.map((r) => `${r.voucher ?? r.date} $${amountReceived(r)}`).join(', ')}`)
+    }
+    if (/first payment|1st payment/i.test(purchase.description) && !instalments.length) notes.push('only a first payment was found; check the price')
+    if (/paid by/i.test(purchase.description)) notes.push(`"${purchase.description}" (someone else paid)`)
+    if (purchase.method !== 'cash') notes.push(`paid by ${purchase.method === 'pos' ? 'card/POS' : 'transfer'}`)
+    return { price, notes }
+  }
+
+  /** Usual billed value per package session for a client in the reports (fallback 38). */
+  const usualRate = (clientId: string) => {
+    const counts = new Map<number, number>()
+    for (const r of reportRows) if (r.info === 'package' && r.billed && idFor(r.name) === clientId) counts.set(r.billed, (counts.get(r.billed) ?? 0) + 1)
+    return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 38
+  }
+
+  // Her statement, matched to clients (latest statement per client wins).
+  const statementById = new Map<string, StatementRow>()
+  for (const t of statementRows) {
+    const m = match(t.name)
+    if (m.kind === 'none' || (m.kind === 'fuzzy' && m.ambiguousWith)) {
+      plan.unmatchedStatement.push({
+        name: t.name,
+        detail: `${t.remaining} of ${t.size} left on ${t.asOf}${m.kind === 'fuzzy' ? `; matches "${nameOf(m.id)}" or "${nameOf(m.ambiguousWith!)}"` : closest(t.name)}`,
+      })
       continue
     }
-    if (!usedKnown && counted === 0) {
+    const prev = statementById.get(m.id)
+    if (!prev || prev.asOf < t.asOf) statementById.set(m.id, t)
+  }
+
+  const handled = new Set<string>()
+  const finish = (clientId: string, detail: string) => plan.finished.push({ name: nameOf(clientId), detail })
+
+  // 1. Her own count: remaining at the end of the statement month, plus sessions since.
+  for (const [clientId, t] of statementById) {
+    const purchases = (byClient.get(clientId) ?? []).filter((r) => r.packageSessions).sort((a, b) => a.date.localeCompare(b.date))
+    const latest = purchases.at(-1)
+    if (latest && latest.date > t.asOf) continue // a newer package was bought after her statement: handled from the files below
+    handled.add(clientId)
+    const since = sessionsAfter(clientId, t.asOf)
+    const used = t.size - t.remaining + since.length
+    const notes = [`her statement: ${t.remaining} of ${t.size} left on ${t.asOf}`]
+    if (since.length) notes.push(`${since.length} package session(s) since (${[...new Set(since.map((e) => (e.source === 'report' ? 'daily reports' : "schedule's C marks")))].join(' + ')})`)
+
+    let price: number
+    if (latest && latest.packageSessions === t.size) {
+      const p = priceOf(latest, byClient.get(clientId)!)
+      price = p.price
+      notes.push(...p.notes)
+      const files = fromFiles(clientId, latest)
+      if (files.usedKnown && files.used !== used) notes.push(`the files alone suggest ${files.used} used; her count is used`)
+    } else {
+      const rate = usualRate(clientId)
+      price = rate * t.size
+      notes.push(`no matching purchase in the cash statement; price estimated as ${t.size} × $${rate}, check it`)
+    }
+
+    const detail = `package of ${t.size}, ${t.remaining} left on ${t.asOf} (her statement)${since.length ? `, ${since.length} since` : ''}`
+    if (used >= t.size) {
+      finish(clientId, detail)
+      continue
+    }
+    plan.proposals.push({
+      clientId,
+      clientName: nameOf(clientId),
+      cashName: latest?.nameRaw ?? t.name,
+      sessionsTotal: t.size,
+      priceTotal: price,
+      purchasedOn: latest && latest.packageSessions === t.size ? latest.date : null,
+      voucher: latest && latest.packageSessions === t.size ? latest.voucher : null,
+      used,
+      usedKnown: true,
+      fromStatement: true,
+      notes,
+    })
+  }
+
+  // 2. Everyone else: from the cash statement purchase and the files.
+  for (const [clientId, rows] of byClient) {
+    if (handled.has(clientId)) continue
+    const latest = rows.filter((r) => r.packageSessions).sort((a, b) => a.date.localeCompare(b.date)).at(-1)
+    if (!latest) continue // only instalment rows; reported below via packageWithoutPurchase if used
+    handled.add(clientId)
+    const N = latest.packageSessions!
+    const { price, notes: priceNotes } = priceOf(latest, rows)
+    const files = fromFiles(clientId, latest)
+    const notes = [...priceNotes, ...files.notes]
+    const t = statementById.get(clientId)
+    if (t) notes.push(`her statement (${t.asOf}) covered an earlier package`)
+
+    const detail = `package of ${N} bought ${latest.date} (${latest.voucher ?? 'no voucher'}), ${files.used} used`
+    if (files.used >= N) {
+      finish(clientId, detail)
+      continue
+    }
+    if (!files.usedKnown && files.counted === 0) {
       plan.dormant.push({ name: nameOf(clientId), detail: `${detail}; no package sessions since ${firstDataDate}` })
       continue
     }
@@ -236,14 +371,15 @@ function buildPlan(
       priceTotal: price,
       purchasedOn: latest.date,
       voucher: latest.voucher,
-      used: Math.min(used, N),
-      usedKnown,
+      used: Math.min(files.used, N),
+      usedKnown: files.usedKnown,
+      fromStatement: false,
       notes,
     })
   }
 
   // Clients billed as Package in the reports with no purchase found.
-  const proposedIds = new Set([...plan.proposals.map((p) => p.clientId), ...byClient.keys()])
+  const proposedIds = new Set([...handled, ...byClient.keys()])
   const onPackage = new Map<string, OldReportRow[]>()
   for (const r of reportRows) {
     if (r.info !== 'package') continue
@@ -288,7 +424,8 @@ function writeReport(plan: Plan) {
     '# Go-live seed report',
     '',
     `Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')}. Sessions counted up to **${until}**.`,
-    `Files: ${[cashFile!, ...reportFiles, ...scheduleFiles].map((f) => f.replace(`${SAMPLES}/`, '')).join(', ')}.`,
+    `Files: ${[cashFile!, ...statementFiles, ...reportFiles, ...scheduleFiles].map((f) => f.replace(`${SAMPLES}/`, '')).join(', ')}.`,
+    statementFiles.length ? 'Where her Statement of Account lists a package, her count of sessions remaining is used.' : '',
     `Daily reports run to ${lastReportDate}; after that, sessions come from the schedule's C marks.`,
     '',
     `## Packages to propose (${plan.proposals.length})`,
@@ -297,10 +434,15 @@ function writeReport(plan: Plan) {
     '',
     ...plan.proposals.map(
       (p) =>
-        `- **${p.clientName}**${normalizeName(p.cashName) !== normalizeName(p.clientName) ? ` (cash: "${p.cashName}")` : ''}: ${p.sessionsTotal} sessions, $${p.priceTotal}, bought ${p.purchasedOn} ${p.voucher ?? ''}; **${p.used} used**${p.usedKnown ? '' : ' (at least)'}, ${p.sessionsTotal - p.used} left. ${p.notes.join('; ')}.`,
+        `- **${p.clientName}**${normalizeName(p.cashName) !== normalizeName(p.clientName) ? ` ("${p.cashName}")` : ''}: ${p.sessionsTotal} sessions, $${p.priceTotal}, ${p.purchasedOn ? `bought ${p.purchasedOn} ${p.voucher ?? ''}` : 'purchase date unknown'}; **${p.used} used**${p.usedKnown ? '' : ' (at least)'}, ${p.sessionsTotal - p.used} left${p.fromStatement ? ' (her count)' : ''}. ${p.notes.join('; ')}.`,
     ),
     '',
     section('Insurance clients to enter by hand', plan.insurance, 'Serial numbers are in no file, so approvals are not seeded.'),
+    section(
+      'In her statement but not matched to a client',
+      plan.unmatchedStatement,
+      'Add the client or a name variant, then run the seed again. Those with sessions left matter most.',
+    ),
     section('Billed as Package, but no purchase found in the cash statement', plan.packageWithoutPurchase, 'Probably bought before January or recorded differently. Add these by hand if still open.'),
     section(
       'Package payers not found among clients, still coming in',
@@ -400,7 +542,8 @@ async function main() {
 
 function summary(plan: Plan) {
   console.log(`Sessions counted up to ${until} (daily reports to ${lastReportDate}, schedule after).`)
-  console.log(`Packages to propose:            ${plan.proposals.length} (${plan.proposals.filter((p) => !p.usedKnown).length} with an uncertain count)`)
+  console.log(`Packages to propose:            ${plan.proposals.length} (${plan.proposals.filter((p) => p.fromStatement).length} from her statement, ${plan.proposals.filter((p) => !p.usedKnown).length} with an uncertain count)`)
+  console.log(`Statement rows not matched:     ${plan.unmatchedStatement.length}`)
   console.log(`Insurance clients to enter:     ${plan.insurance.length}`)
   console.log(`On package, no purchase found:  ${plan.packageWithoutPurchase.length}`)
   console.log(`Package payers not matched:     ${plan.unmatchedPayers.length} people (${plan.unmatchedPayers.filter((p) => p.active).length} still coming in)`)
@@ -439,6 +582,12 @@ function yesterday(): string {
   const d = new Date()
   d.setDate(d.getDate() - 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function addDays(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 function daysBetween(from: string, to: string): number {
