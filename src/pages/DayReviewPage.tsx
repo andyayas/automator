@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { DaySources } from '../components/DaySources'
+import { MonthDownload } from '../components/MonthDownload'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
 import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, reopenDay, saveReport } from '../lib/day-api'
@@ -326,6 +327,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
           </div>
         </>
       )}
+
+      {ready && <MonthDownload date={date} />}
 
       {editing && (
         <EditRowDialog

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
 import { applyEdits, emptyEdits, toReportData } from './day-edits'
+import { monthReportDays } from './month-report'
 
 const base = {
   owner_id: 'u',
@@ -228,5 +229,50 @@ describe('applyEdits and toReportData', () => {
     expect(data.sections.per_session.map((r) => r.client)).toEqual(['Jane Testerson'])
     expect(data.totalClients).toBe(2)
     expect(data.packageNotPaid).toBe(1)
+  })
+})
+
+describe('monthReportDays', () => {
+  const session = (over: Record<string, unknown>) => ({
+    id: String(Math.random()),
+    owner_id: 'u',
+    created_at: '',
+    updated_at: '',
+    client_id: 'jane',
+    client_name: 'Jane Testerson',
+    therapist: 'Therapist A',
+    billing_type: 'per_session',
+    payment_method: 'cash',
+    package_id: null,
+    approval_id: null,
+    schedule_entry_id: null,
+    cash_transaction_id: null,
+    session_no: null,
+    billed: 45,
+    collected: 45,
+    extra_note: null,
+    confirmed: true,
+    date: '2026-10-15',
+    ...over,
+  })
+
+  it('builds one tab per confirmed day, in date order, with serials and expenses', () => {
+    const days = monthReportDays({
+      confirmedDates: ['2026-10-16', '2026-10-15'],
+      sessions: [
+        session({}),
+        session({ date: '2026-10-16', client_id: 'lina', client_name: 'Lina Example', billing_type: 'insurance', approval_id: 'a1', billed: 25, collected: 5, session_no: 2 }),
+        session({ date: '2026-10-16', client_id: 'omar', client_name: 'Omar Sample', billing_type: 'package', package_id: 'p1', billed: 40, collected: 0, session_no: 7 }),
+      ] as never,
+      expenses: [{ date: '2026-10-16', name_raw: 'acme water', description: '5 boxes of water', credit: 12, pos_amount: null }],
+      labels: new Map([['acme water|5 boxes of water', 'Water 5 boxes']]),
+      packages: [{ ...pkg('p1', 'omar', 6), amount_paid: 100 }],
+      approvals: [approval('a1', 'lina', 1)],
+    })
+    expect(days.map((d) => d.sheetName)).toEqual(['Thu Oct 15', 'Fri Oct 16'])
+    expect(days[1].data.sections.insurance).toMatchObject([{ client: 'Lina Example', serialNumber: 'S-1', sessionNo: 2 }])
+    expect(days[1].data.expenses).toEqual([{ label: 'Water 5 boxes', amount: 12 }])
+    expect(days[1].data.packageNotPaid).toBe(1)
+    expect(days[0].data.totalClients).toBe(1)
   })
 })

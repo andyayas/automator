@@ -92,9 +92,13 @@ anything.
       (Web) with origins `https://andyayas.github.io` and
       `http://localhost:5173`, scope `spreadsheets.readonly`, Testing mode.
       Client ID in `.env.local` and the `VITE_GOOGLE_CLIENT_ID` repo variable.
-- [ ] Google Auth Platform → Audience → Test users: the account(s) that open
-      the clinic sheet (hers and/or the clinic's).
-- [ ] Settings in the app: sender name, and each month's sheet link.
+- [x] Google Auth Platform → Audience → Test users: the account(s) that open
+      the clinic sheet.
+- [x] Settings in the app: sender name, and the October sheet link
+      (add each new month's link when the new sheet starts).
+- [x] Go-live (2026-10-15): Contacts imported, `npm run seed -- --apply` run.
+- [ ] She reviews the proposed packages on Today and enters insurance
+      approvals by hand (seed report lists the insurance clients).
 
 ## Principles
 
@@ -155,7 +159,7 @@ anything.
   `.env.local`, read only by test code.
 - **The cash statement file never leaves the device.** Decrypt and parse in the
   browser, then send only the parsed transaction rows to Supabase.
-- Add an **"Export all data"** button (JSON + CSV download) as her own backup.
+- ~~"Export all data" button~~: not needed (owner's decision, 2026-10-15).
 
 ## Data sources
 

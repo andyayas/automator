@@ -111,17 +111,28 @@ describe('Today', () => {
 })
 
 describe('Clients', () => {
-  it('shows clients with something active, then searches all of them', async () => {
-    api.fetchPackages.mockResolvedValue([pkg({})])
+  it('lists packages by default, filters them, and searches everyone under All clients', async () => {
+    api.fetchPackages.mockResolvedValue([pkg({}), pkg({ id: 'p2', client: omar, client_id: 'c2', status: 'proposed' })])
     renderRoute('/clients', [{ path: '/clients', element: <ClientsPage /> }])
+    const user = userEvent.setup()
 
+    expect(await screen.findByRole('tab', { name: 'Packages', selected: true })).toBeInTheDocument()
     expect(await screen.findByText('Jane Testerson')).toBeInTheDocument()
-    expect(screen.getByText('Pkg 8')).toBeInTheDocument()
-    expect(screen.queryByText('Omar Sample')).not.toBeInTheDocument()
+    expect(screen.getByText('8 of 12 left')).toBeInTheDocument()
+    expect(screen.getByText('To review')).toBeInTheDocument()
 
-    await userEvent.setup().type(screen.getByRole('searchbox'), 'oma')
-    expect(screen.getByText('Omar Sample')).toBeInTheDocument()
+    await user.type(screen.getByRole('searchbox'), 'oma')
     expect(screen.queryByText('Jane Testerson')).not.toBeInTheDocument()
+    expect(screen.getByText('Omar Sample')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'All clients' }))
+    expect(await screen.findByText('Omar Sample')).toBeInTheDocument()
+    expect(screen.queryByText('Jane Testerson')).not.toBeInTheDocument()
+  })
+
+  it('shows approvals on the Insurance tab', async () => {
+    renderRoute('/clients?tab=insurance', [{ path: '/clients', element: <ClientsPage /> }])
+    expect(await screen.findByText(/No active approvals/)).toBeInTheDocument()
   })
 })
 

@@ -70,7 +70,39 @@ export async function buildReport(template: ArrayBuffer | Uint8Array, data: Repo
   await wb.xlsx.load(template as ArrayBuffer)
   const ws = wb.getWorksheet('Daily Report') ?? wb.worksheets[0]
   if (!ws) throw new Error('The template has no sheet.')
+  fillReportSheet(ws, data)
+  // Excel recalculates on open (the cached results are for previews).
+  wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
+  return new Uint8Array(await wb.xlsx.writeBuffer())
+}
 
+/**
+ * A month in one file: one tab per day (e.g. "Thu Oct 15"), each a copy of the
+ * template (logo included) filled like the daily report.
+ */
+export async function buildMonthReport(
+  template: ArrayBuffer | Uint8Array,
+  days: Array<{ sheetName: string; data: ReportData }>,
+): Promise<Uint8Array> {
+  if (!days.length) throw new Error('No confirmed days in this month yet.')
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(template as ArrayBuffer)
+  const tpl = wb.getWorksheet('Daily Report') ?? wb.worksheets[0]
+  if (!tpl) throw new Error('The template has no sheet.')
+  // Copying the sheet model copies its cells, styles, merges and the logo.
+  const model = JSON.stringify(tpl.model)
+  for (const day of days) {
+    const ws = wb.addWorksheet(day.sheetName)
+    ws.model = { ...(JSON.parse(model) as ExcelJS.WorksheetModel), id: ws.id, name: day.sheetName }
+    fillReportSheet(ws, day.data)
+  }
+  wb.removeWorksheet(tpl.id)
+  wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
+  return new Uint8Array(await wb.xlsx.writeBuffer())
+}
+
+/** Fills one sheet that holds a copy of the template. */
+function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   // Styles taken from the template's own cells, so its look carries over.
   const style = (addr: string): Style => JSON.parse(JSON.stringify(ws.getCell(addr).style ?? {}))
   const s = {
@@ -216,8 +248,5 @@ export async function buildReport(template: ArrayBuffer | Uint8Array, data: Repo
   put(`F${incomeTop + 3}`, 'Net', s.sumLabel)
   put(`G${incomeTop + 3}`, f(`G${incomeTop + 1}-G${incomeTop + 2}`, totalCollected - totalExpenses), money)
 
-  // Excel recalculates on open (the results above are for previews).
-  wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
-  return new Uint8Array(await wb.xlsx.writeBuffer())
 }

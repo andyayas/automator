@@ -4,6 +4,7 @@
 import type { Tables } from './database.types'
 import type { DayRow, ExpenseLine } from './day-builder'
 import builtInTemplateUrl from '../assets/daily-report-template.xlsx?url'
+import { monthRange } from './month-report'
 import { supabase } from './supabase'
 
 export type DaySessionRow = Tables<'day_sessions'>
@@ -201,4 +202,32 @@ export async function downloadSavedReport(path: string): Promise<Uint8Array> {
   const { data, error } = await supabase.storage.from(BUCKET).download(path)
   if (error || !data) throw new Error('The saved report could not be found.')
   return new Uint8Array(await data.arrayBuffer())
+}
+
+/** Everything the month file needs, plus the working days not confirmed yet. */
+export async function fetchMonth(month: string, today: string) {
+  const { from, to } = monthRange(month)
+  const [reviews, sessions, expenses, labels, scheduled] = await Promise.all([
+    supabase.from('day_reviews').select('date').gte('date', from).lte('date', to).not('confirmed_at', 'is', null),
+    supabase.from('day_sessions').select('*').gte('date', from).lte('date', to).eq('confirmed', true).order('created_at'),
+    supabase
+      .from('cash_transactions')
+      .select('date, name_raw, description, credit, pos_amount')
+      .gte('date', from)
+      .lte('date', to)
+      .eq('kind', 'expense')
+      .eq('missing_from_source', false),
+    supabase.from('expense_labels').select('match_key, label'),
+    supabase.from('schedule_entries').select('date').gte('date', from).lte('date', to < today ? to : today).eq('is_non_client', false),
+  ])
+  for (const r of [reviews, sessions, expenses, labels, scheduled]) fail(r.error)
+  const confirmedDates = reviews.data!.map((r) => r.date)
+  const notConfirmed = [...new Set(scheduled.data!.map((s) => s.date))].filter((d) => !confirmedDates.includes(d)).sort()
+  return {
+    confirmedDates,
+    notConfirmed,
+    sessions: sessions.data!,
+    expenses: expenses.data!,
+    labels: new Map(labels.data!.map((l) => [l.match_key, l.label])),
+  }
 }
