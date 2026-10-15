@@ -4,6 +4,7 @@
 // Synthetic, tagged rows only; everything created is deleted at the end.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as api from './api'
+import { planContactsImport } from './contacts-plan'
 import { supabase } from './supabase'
 
 const TAG = `itest-${Date.now()}`
@@ -35,7 +36,7 @@ describe('contacts import', () => {
       name: `${TAG} Person ${i}`,
       phone: `9617100000${i}`,
     }))
-    const first = api.planContactsImport(contacts, await api.fetchAllClients())
+    const first = planContactsImport(contacts, await api.fetchAllClients())
     expect(first.inserts).toHaveLength(3)
     await api.applyContactsImport(first)
 
@@ -47,7 +48,7 @@ describe('contacts import', () => {
     await api.updateClient(mine[1].id, { name: `${TAG} Renamed` })
 
     const changed = contacts.map((c, i) => (i === 0 || i === 1 ? { ...c, phone: `9617655555${i}` } : c))
-    const second = api.planContactsImport(changed, await api.fetchAllClients())
+    const second = planContactsImport(changed, await api.fetchAllClients())
     expect(second.inserts).toHaveLength(0)
     expect(second.phoneUpdates).toHaveLength(2)
     expect(second.unchanged).toBe(1)

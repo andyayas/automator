@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
 import { PageHeader } from '../components/ui'
-import { applyContactsImport, fetchAllClients, planContactsImport, type ContactsPlan } from '../lib/api'
+import { applyContactsImport, fetchAllClients } from '../lib/api'
+import { planContactsImport, type ContactsPlan } from '../lib/contacts-plan'
 import { plural } from '../lib/format'
 import { useInvalidate } from '../lib/queries'
 

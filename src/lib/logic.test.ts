@@ -1,7 +1,8 @@
 // Synthetic data only.
 import { describe, expect, it } from 'vitest'
 import { balanceAlerts } from './alerts'
-import { planContactsImport, type ApprovalWithBalance, type Client, type PackageWithBalance } from './api'
+import type { ApprovalWithBalance, Client, PackageWithBalance } from './api'
+import { planContactsImport } from './contacts-plan'
 import { daysBetween, formatMoney, parseNumber, perSessionValue } from './format'
 import { searchClients } from './search'
 
