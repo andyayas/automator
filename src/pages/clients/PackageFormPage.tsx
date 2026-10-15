@@ -26,6 +26,7 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
   const [perSessionEdited, setPerSessionEdited] = useState(Boolean(pkg))
   const [purchasedOn, setPurchasedOn] = useState(pkg?.purchased_on ?? todayISO())
   const [voucher, setVoucher] = useState(pkg?.source_voucher ?? '')
+  const [paid, setPaid] = useState(numberText(pkg?.amount_paid))
   const [used, setUsed] = useState(numberText(pkg?.sessions_used_before_app ?? 0))
   const [asOf, setAsOf] = useState(pkg?.used_before_app_as_of ?? todayISO())
   const [status, setStatus] = useState<Status>(pkg?.status ?? 'active')
@@ -43,10 +44,12 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
     const total = parseNumber(price)
     const each = parseNumber(shownPerSession)
     const usedN = parseNumber(used) ?? 0
+    const paidN = parseNumber(paid)
     if (!n || n < 1 || !Number.isInteger(n)) return setError('Sessions must be a whole number of at least 1.')
     if (total === null || total < 0) return setError('Enter the package price.')
     if (each === null || each < 0) return setError('Enter the value per session.')
     if (!Number.isInteger(usedN) || usedN < 0 || usedN > n) return setError(`Sessions already used must be between 0 and ${n}.`)
+    if (paidN !== null && paidN < 0) return setError('Amount paid can’t be negative.')
     setSaving(true)
     setError(null)
     try {
@@ -57,6 +60,7 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
         per_session: each,
         purchased_on: purchasedOn || null,
         source_voucher: voucher.trim() || null,
+        amount_paid: paidN,
         sessions_used_before_app: usedN,
         used_before_app_as_of: usedN > 0 ? asOf || null : null,
         status,
@@ -117,6 +121,17 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
             <input value={voucher} onChange={(e) => setVoucher(e.target.value)} placeholder="rc…" autoCapitalize="none" />
           </Field>
         </div>
+
+        <Field
+          label="Amount paid so far ($)"
+          hint={
+            parseNumber(paid) !== null && parseNumber(price) !== null && parseNumber(paid)! < parseNumber(price)!
+              ? `Not fully paid: $${parseNumber(price)! - parseNumber(paid)!} still due.`
+              : 'Leave empty if unknown. Counts toward “Package Not Paid” on the report.'
+          }
+        >
+          <input inputMode="decimal" value={paid} onChange={(e) => setPaid(e.target.value)} />
+        </Field>
 
         <UsedBeforeFields used={used} asOf={asOf} onUsed={setUsed} onAsOf={setAsOf} />
         {pkg && <SessionsSummary inApp={pkg.sessions_used_in_app} remaining={pkg.sessions_remaining} />}

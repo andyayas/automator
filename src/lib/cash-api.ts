@@ -79,6 +79,7 @@ export async function applyCashImport(plan: CashImportPlan, fileName: string, fi
         per_session: Math.round(p.price / p.sessions),
         purchased_on: p.date,
         source_voucher: p.voucher,
+        amount_paid: p.price,
         status: 'proposed',
         notes: p.note,
       })),

@@ -3,11 +3,10 @@ import { useNavigate, useParams } from 'react-router'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { deleteApproval, saveApproval, type ApprovalWithBalance, type Status } from '../../lib/api'
 import { numberText, parseNumber, todayISO } from '../../lib/format'
-import { useApproval, useClient, useInsurers, useInvalidate } from '../../lib/queries'
+import { DEFAULT_PRICES, SETTING } from '../../lib/defaults'
+import { useApproval, useClient, useInsurers, useInvalidate, useSettings } from '../../lib/queries'
 import { Field, SessionsSummary, StatusSelect, UsedBeforeFields } from './form-parts'
 
-/** Typical insurance billing per session (CLAUDE.md); she can change it per approval. */
-const DEFAULT_BILLED = 25
 
 /** /clients/:clientId/approvals/new or /approvals/:approvalId */
 export function ApprovalFormPage() {
@@ -24,10 +23,12 @@ function ApprovalForm({ approval, clientId }: { approval?: ApprovalWithBalance; 
   const invalidate = useInvalidate()
   const client = useClient(clientId)
   const insurers = useInsurers()
+  const settings = useSettings()
+  const defaultBilled = Number(settings.data?.[SETTING.insuranceBilled] ?? DEFAULT_PRICES.insuranceBilled)
   const [insurer, setInsurer] = useState(approval?.insurer ?? '')
   const [serial, setSerial] = useState(approval?.serial_number ?? '')
   const [sessions, setSessions] = useState(numberText(approval?.sessions_approved))
-  const [billed, setBilled] = useState(numberText(approval?.billed_per_session ?? DEFAULT_BILLED))
+  const [billed, setBilled] = useState(numberText(approval?.billed_per_session ?? defaultBilled))
   const [copay, setCopay] = useState(numberText(approval?.copay_per_session ?? 0))
   const [approvedOn, setApprovedOn] = useState(approval?.approved_on ?? todayISO())
   const [validUntil, setValidUntil] = useState(approval?.valid_until ?? '')

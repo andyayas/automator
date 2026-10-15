@@ -32,6 +32,7 @@ function pkg(id: string, remaining: number, status: PackageWithBalance['status']
     per_session: 38,
     purchased_on: '2026-09-01',
     source_voucher: null,
+    amount_paid: 450,
   }
 }
 

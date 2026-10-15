@@ -8,6 +8,7 @@ import { ClientFormPage } from './pages/clients/ClientFormPage'
 import { ClientsPage } from './pages/clients/ClientsPage'
 import { PackageFormPage } from './pages/clients/PackageFormPage'
 import { CashImportPage } from './pages/CashImportPage'
+import { DayReviewPage } from './pages/DayReviewPage'
 import { ImportContactsPage } from './pages/ImportContactsPage'
 import { MorePage } from './pages/MorePage'
 import { RemindersPage } from './pages/RemindersPage'
@@ -28,6 +29,7 @@ export const routes: RouteObject[] = [
     ),
     children: [
       { index: true, element: <TodayPage /> },
+      { path: 'day/:date', element: <DayReviewPage /> },
       { path: 'schedule', element: <SchedulePage /> },
       { path: 'schedule/import', element: <ScheduleImportPage /> },
       { path: 'clients', element: <ClientsPage /> },

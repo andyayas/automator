@@ -63,6 +63,9 @@ anything.
 - `npm run test:integration` runs the data layer against the live project as
   RLS test user A (synthetic rows, cleaned up).
 - `npm run gen:types` regenerates `src/lib/database.types.ts` after migrations.
+- `npm run compare:reports` rebuilds each day her old reports cover and
+  compares clients, collected amounts and billing (details in
+  `samples/report-comparison.md`).
 - `npm run seed` (dry run) / `npm run seed -- --apply` is the go-live seed. It
   writes `samples/seed-report.md` (real names, gitignored) and prints counts only.
   People in her statement, the daily reports or recent package payments who
@@ -509,7 +512,7 @@ locally before calling a phase done.
 
    `{sender_name}` comes from settings. The current text signs with her name
    and the clinic name; keep those in settings, not in the repo.
-4. **Daily review and report**: build the day, matching schedule + cash +
+4. **Daily review and report** *(built 2026-10-15 on branch `phase-4`, not deployed yet; `npm run compare:reports` rebuilds her September/October days: 302 of 316 clients matched, 292 of 302 collected amounts identical; the rest are flagged cases: free sessions not marked on the sheet, spelling variants to link once, no-shows)*: build the day, matching schedule + cash +
    packages/approvals. Flags: unmatched name, paid-but-not-scheduled,
    no-status, package/approval exhausted, session-number mismatch. She edits
    and confirms, then the report is generated from the template, downloaded,

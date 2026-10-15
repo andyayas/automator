@@ -4,6 +4,7 @@ import { createClientRecord } from '../lib/api'
 import { formatPhone } from '../lib/phone'
 import { displayName, normalizeName } from '../lib/names'
 import { useClients, useInvalidate } from '../lib/queries'
+import { linkCashName } from '../lib/day-api'
 import { linkNameToClient } from '../lib/schedule-api'
 import { searchClients } from '../lib/search'
 
@@ -83,7 +84,9 @@ export function LinkClientDialog({
     setError(null)
     try {
       await linkNameToClient(normalizeName(name), clientId)
-      await Promise.all([invalidate.schedule(), invalidate.client(clientId)])
+      // Payments written under this spelling count for the client too.
+      await linkCashName(normalizeName(name), clientId, normalizeName)
+      await Promise.all([invalidate.schedule(), invalidate.day(), invalidate.client(clientId)])
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

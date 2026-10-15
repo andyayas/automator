@@ -1,6 +1,7 @@
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
 import * as sched from './schedule-api'
+import * as day from './day-api'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,6 +23,11 @@ export const keys = {
   reminders: (date: string) => ['reminders', date] as const,
   settings: ['settings'] as const,
   patterns: ['patterns'] as const,
+  dayCash: (date: string) => ['day-cash', date] as const,
+  dayReview: (date: string) => ['day-review', date] as const,
+  expenseLabels: ['expense-labels'] as const,
+  template: ['template'] as const,
+  latestCash: ['latest-cash'] as const,
 }
 
 export const useClients = () =>
@@ -49,6 +55,12 @@ export const useReminders = (date: string) =>
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: sched.fetchSettings })
 export const usePatterns = () => useQuery({ queryKey: keys.patterns, queryFn: sched.fetchPatterns })
 
+export const useDayCash = (date: string) => useQuery({ queryKey: keys.dayCash(date), queryFn: () => day.fetchCashForDay(date) })
+export const useDayReview = (date: string) => useQuery({ queryKey: keys.dayReview(date), queryFn: () => day.fetchDayReview(date) })
+export const useExpenseLabels = () => useQuery({ queryKey: keys.expenseLabels, queryFn: day.fetchExpenseLabels })
+export const useTemplateInfo = () => useQuery({ queryKey: keys.template, queryFn: day.templateInfo })
+export const useLatestCashDate = () => useQuery({ queryKey: keys.latestCash, queryFn: day.fetchLatestCashDate })
+
 /** Refetch everything that shows packages or approvals after a change. */
 export function useInvalidate() {
   const client = useQueryClient()
@@ -65,6 +77,16 @@ export function useInvalidate() {
         client.invalidateQueries({ queryKey: ['schedule'] }),
         client.invalidateQueries({ queryKey: ['reminders'] }),
       ]),
+    day: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['day-review'] }),
+        client.invalidateQueries({ queryKey: ['day-cash'] }),
+        client.invalidateQueries({ queryKey: keys.latestCash }),
+        client.invalidateQueries({ queryKey: keys.expenseLabels }),
+        client.invalidateQueries({ queryKey: keys.packages }),
+        client.invalidateQueries({ queryKey: keys.approvals }),
+      ]),
+    template: () => client.invalidateQueries({ queryKey: keys.template }),
     settings: () =>
       Promise.all([client.invalidateQueries({ queryKey: keys.settings }), client.invalidateQueries({ queryKey: keys.patterns })]),
     client: (id: string) =>

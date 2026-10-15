@@ -1,9 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
-import { SETTING } from '../lib/defaults'
+import { uploadTemplate } from '../lib/day-api'
+import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
+import { formatDate, parseNumber } from '../lib/format'
 import { normalizeName } from '../lib/names'
-import { keys, useInvalidate, usePatterns, useSettings } from '../lib/queries'
+import { keys, useInvalidate, usePatterns, useSettings, useTemplateInfo } from '../lib/queries'
 import { DEFAULT_REMINDER_TEMPLATE, REMINDER_PLACEHOLDERS, renderReminder, tomorrowISO } from '../lib/reminders'
 import { addPattern, deletePattern, ensureDefaults, saveSetting } from '../lib/schedule-api'
 import { Field } from './clients/form-parts'
@@ -29,6 +31,8 @@ export function SettingsPage() {
   return (
     <section className="page">
       <PageHeader title="Settings" back="/more" />
+      <TemplateSettings />
+      <PriceSettings settings={settings.data} />
       <ReminderSettings settings={settings.data} />
       <SheetLinks settings={settings.data} />
       <StaffNames settings={settings.data} />
@@ -247,5 +251,79 @@ function PatternList({ rows }: { rows: Array<{ id: string; pattern: string; matc
       </form>
       {error && <p className="error">{error}</p>}
     </>
+  )
+}
+
+function TemplateSettings() {
+  const info = useTemplateInfo()
+  const invalidate = useInvalidate()
+  const [state, setState] = useState<string | null>(null)
+  return (
+    <Section title="Daily report template">
+      <div className="card">
+        <p className="small">
+          The blank daily report (.xlsx) with the logo. It is stored privately in your account and filled in when you
+          confirm a day.
+        </p>
+        <p className="muted small">
+          {info.data ? `Uploaded ${formatDate(info.data.updatedAt?.slice(0, 10))}.` : info.isPending ? '' : 'Not uploaded yet.'}
+        </p>
+        {state && <p className={state.startsWith('Saved') ? 'muted small' : 'error'}>{state}</p>}
+        <label className="button block file-button">
+          {info.data ? 'Replace the template' : 'Upload the template'}
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              setState('Uploading…')
+              try {
+                await uploadTemplate(file)
+                await invalidate.template()
+                setState('Saved.')
+              } catch (err) {
+                setState(err instanceof Error ? err.message : String(err))
+              }
+            }}
+          />
+        </label>
+      </div>
+    </Section>
+  )
+}
+
+function PriceSettings({ settings }: { settings: Record<string, unknown> }) {
+  const [perSession, setPerSession] = useState(String(settings[SETTING.perSessionPrice] ?? DEFAULT_PRICES.perSessionPrice))
+  const [insurance, setInsurance] = useState(String(settings[SETTING.insuranceBilled] ?? DEFAULT_PRICES.insuranceBilled))
+  const { save, note, isError } = useSaver()
+  return (
+    <Section title="Default prices">
+      <form
+        className="card form"
+        onSubmit={async (e) => {
+          e.preventDefault()
+          const a = parseNumber(perSession)
+          const b = parseNumber(insurance)
+          if (a === null || b === null) return
+          await save(SETTING.perSessionPrice, a)
+          await save(SETTING.insuranceBilled, b)
+        }}
+      >
+        <div className="field-row">
+          <Field label="Single session ($)" hint="Used when someone came but nothing was paid yet.">
+            <input inputMode="decimal" value={perSession} onChange={(e) => setPerSession(e.target.value)} />
+          </Field>
+          <Field label="Insurance billed ($)" hint="Default for new approvals; each approval can differ.">
+            <input inputMode="decimal" value={insurance} onChange={(e) => setInsurance(e.target.value)} />
+          </Field>
+        </div>
+        {note && <p className={isError ? 'error' : 'muted small'}>{note}</p>}
+        <button type="submit" className="button">
+          Save prices
+        </button>
+      </form>
+    </Section>
   )
 }

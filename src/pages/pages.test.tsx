@@ -23,6 +23,7 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('../lib/api', () => api)
 vi.mock('../lib/schedule-api', () => ({}))
+vi.mock('../lib/day-api', () => ({ fetchRecentReviews: async () => [] }))
 
 const jane = { id: 'c1', name: 'Jane Testerson', phone: '96171000001' }
 const omar = { id: 'c2', name: 'Omar Sample', phone: null }
@@ -52,6 +53,7 @@ function pkg(overrides: Partial<PackageWithBalance>): PackageWithBalance {
     per_session: 38,
     purchased_on: '2026-09-01',
     source_voucher: 'rc12',
+    amount_paid: 450,
     sessions_used_before_app: 4,
     used_before_app_as_of: '2026-10-14',
     status: 'active',

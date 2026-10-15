@@ -1,0 +1,675 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { DateNav, LinkClientDialog } from '../components/schedule-ui'
+import { SheetRefresh } from '../components/SheetRefresh'
+import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
+import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
+import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, reopenDay, saveReport } from '../lib/day-api'
+import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type DayRow } from '../lib/day-builder'
+import { applyEdits, emptyEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
+import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
+import { formatDate, formatMoney, numberText, parseNumber, plural, todayISO } from '../lib/format'
+import {
+  useApprovals,
+  useClients,
+  useDayCash,
+  useDayReview,
+  useExpenseLabels,
+  useInvalidate,
+  useLatestCashDate,
+  usePackages,
+  useScheduleDay,
+  useSettings,
+  useTemplateInfo,
+} from '../lib/queries'
+import { searchClients } from '../lib/search'
+
+// Her edits are kept on this device while she works, so leaving the page loses nothing.
+const editsKey = (date: string) => `clinic-admin.day-edits.${date}`
+function loadEdits(date: string): DayEdits {
+  try {
+    const raw = localStorage.getItem(editsKey(date))
+    return raw ? { ...emptyEdits(), ...(JSON.parse(raw) as DayEdits) } : emptyEdits()
+  } catch {
+    return emptyEdits()
+  }
+}
+function storeEdits(date: string, edits: DayEdits | null) {
+  try {
+    if (edits) localStorage.setItem(editsKey(date), JSON.stringify(edits))
+    else localStorage.removeItem(editsKey(date))
+  } catch {
+    // Storage unavailable: edits only live in memory.
+  }
+}
+
+export function DayReviewPage() {
+  const { date = todayISO() } = useParams()
+  const navigate = useNavigate()
+  return <DayReview key={date} date={date} onDate={(d) => navigate(`/day/${d}`, { replace: true })} />
+}
+
+function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void }) {
+  const entries = useScheduleDay(date)
+  const cash = useDayCash(date)
+  const packages = usePackages()
+  const approvals = useApprovals()
+  const clients = useClients()
+  const labels = useExpenseLabels()
+  const settings = useSettings()
+  const review = useDayReview(date)
+  const template = useTemplateInfo()
+  const latestCash = useLatestCashDate()
+  const invalidate = useInvalidate()
+
+  const [edits, setEdits] = useState<DayEdits>(() => loadEdits(date))
+  const [editing, setEditing] = useState<DayRow | null>(null)
+  const [linking, setLinking] = useState<DayRow | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const first = useRef(true)
+
+  useEffect(() => {
+    if (first.current) {
+      first.current = false
+      return
+    }
+    storeEdits(date, edits)
+  }, [date, edits])
+
+  const defaults = useMemo(
+    () => ({
+      perSessionPrice: Number(settings.data?.[SETTING.perSessionPrice] ?? DEFAULT_PRICES.perSessionPrice),
+      insuranceBilled: Number(settings.data?.[SETTING.insuranceBilled] ?? DEFAULT_PRICES.insuranceBilled),
+    }),
+    [settings.data],
+  )
+  const ready = Boolean(entries.data && cash.data && packages.data && approvals.data && clients.data && labels.data && settings.data)
+  const draft = useMemo(() => {
+    if (!entries.data || !cash.data || !packages.data || !approvals.data || !clients.data || !labels.data) return null
+    return buildDayDraft({
+      date,
+      entries: entries.data,
+      cash: cash.data,
+      packages: packages.data,
+      approvals: approvals.data,
+      clientNames: new Map(clients.data.map((c) => [c.id, c.name])),
+      expenseLabels: labels.data,
+      defaults,
+    })
+  }, [date, entries.data, cash.data, packages.data, approvals.data, clients.data, labels.data, defaults])
+
+  const confirmed = Boolean(review.data?.review?.confirmed_at)
+  const final = useMemo(() => (draft ? applyEdits(draft, edits) : null), [draft, edits])
+  const expenses = useMemo(
+    () => (draft?.expenses ?? []).map((e) => ({ ...e, label: edits.labels[e.cashId] ?? e.label })),
+    [draft, edits.labels],
+  )
+  const update = (fn: (e: DayEdits) => DayEdits) => setEdits((prev) => fn(structuredClone(prev)))
+  const editRow = (key: string, change: RowEdit) => update((e) => ({ ...e, rows: { ...e.rows, [key]: { ...e.rows[key], ...change } } }))
+
+  if (review.isError || entries.isError || cash.isError) {
+    return (
+      <section className="page">
+        <PageHeader title="Daily review" back="/" />
+        <ErrorCard error={review.error ?? entries.error ?? cash.error} />
+      </section>
+    )
+  }
+
+  async function onConfirm() {
+    if (!final || !draft) return
+    setBusy('Saving the day…')
+    setError(null)
+    try {
+      await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)))
+      if (template.data) {
+        setBusy('Filling the report…')
+        const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
+        const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        const data = toReportData(final.rows, expenses, packages.data ?? [], dateLabel)
+        const bytes = await buildReport(templateBytes, data)
+        setBusy('Saving the report…')
+        await saveReport(date, bytes)
+        downloadFile(bytes, `Daily Report ${date}.xlsx`)
+      }
+      storeEdits(date, null)
+      setEdits(emptyEdits())
+      await invalidate.day()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onReopen() {
+    if (!window.confirm('Reopen this day? Its sessions stop counting against packages and approvals until you confirm it again.')) return
+    setBusy('Reopening…')
+    try {
+      await reopenDay(date)
+      await invalidate.day()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function onDownload() {
+    const path = review.data?.review?.report_storage_path
+    if (!path) return
+    try {
+      downloadFile(await downloadSavedReport(path), `Daily Report ${date}.xlsx`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const rows = final?.rows ?? []
+  const attention = rows.filter((r) => r.flags.length)
+  const totals = {
+    billed: rows.reduce((s, r) => s + r.billed, 0),
+    collected: rows.reduce((s, r) => s + r.collected, 0),
+    expenses: expenses.reduce((s, e) => s + e.amount, 0),
+  }
+  const cashBehind = latestCash.data !== undefined && (latestCash.data ?? '') < date && date <= todayISO()
+
+  return (
+    <section className="page">
+      <PageHeader title="Daily review" back="/" />
+      <DateNav date={date} onChange={onDate} />
+      {error && <p className="error" role="alert">{error}</p>}
+
+      {!ready || review.isPending ? (
+        <Loading />
+      ) : confirmed ? (
+        <ConfirmedDay
+          date={date}
+          sessions={review.data!.sessions}
+          confirmedAt={review.data!.review!.confirmed_at!}
+          hasReport={Boolean(review.data!.review!.report_storage_path)}
+          busy={busy}
+          onDownload={onDownload}
+          onReopen={onReopen}
+        />
+      ) : (
+        <>
+          {!entries.data!.length && (
+            <div className="card notice">
+              <p className="small">No schedule loaded for this day yet.</p>
+              <SheetRefresh date={date} />
+            </div>
+          )}
+          {cashBehind && (
+            <div className="card notice">
+              <p className="small">
+                The cash statement in the app ends on {formatDate(latestCash.data, { short: true }) || 'nothing yet'}.{' '}
+                <Link to="/more/cash">Upload the latest one</Link> so today’s payments are included.
+              </p>
+            </div>
+          )}
+
+          <div className="card day-summary">
+            <div>
+              <p className="strong">{plural(rows.length, 'client')}</p>
+              <p className="muted small">
+                Billed {formatMoney(totals.billed)} · Collected {formatMoney(totals.collected)} · Expenses {formatMoney(totals.expenses)}
+              </p>
+            </div>
+            {attention.length ? <Badge tone="warn">{attention.length} to check</Badge> : <Badge tone="accent">All clear</Badge>}
+          </div>
+
+          {attention.length > 0 && (
+            <Section title="Needs a look" count={attention.length}>
+              <div className="stack">
+                {attention.map((r) => (
+                  <RowCard
+                    key={r.key}
+                    row={r}
+                    onEdit={() => setEditing(r)}
+                    onLink={() => setLinking(r)}
+                    onFree={() => editRow(r.key, { billingType: 'free', billed: 0 })}
+                    onCame={() => editRow(r.key, {})}
+                    onRemove={() => update((e) => ({ ...e, removed: [...e.removed, r.key] }))}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {SECTION_ORDER.map((type) => {
+            const list = rows.filter((r) => r.billingType === type && !r.flags.length)
+            if (!list.length) return null
+            return (
+              <Section key={type} title={SECTION_LABEL[type]} count={list.length}>
+                <div className="stack">
+                  {list.map((r) => (
+                    <RowCard key={r.key} row={r} onEdit={() => setEditing(r)} />
+                  ))}
+                </div>
+              </Section>
+            )
+          })}
+
+          <button type="button" className="button block" onClick={() => setAdding(true)}>
+            Add a client to this day
+          </button>
+
+          {final!.excluded.length > 0 && (
+            <details className="details card">
+              <summary>Not counted ({final!.excluded.length})</summary>
+              <div className="card list">
+                {final!.excluded.map((r) => (
+                  <div key={r.key} className="list-row">
+                    <span className="row-text">
+                      <span>{r.clientName}</span>
+                      <span className="muted small">
+                        {r.status === 'cancelled' ? 'Cancelled (X)' : r.status === 'rescheduled' ? 'Rescheduled (R)' : 'Removed'}
+                        {r.slotTime ? ` · ${r.slotTime}` : ''}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      className="button small-button"
+                      onClick={() =>
+                        update((e) =>
+                          e.removed.includes(r.key)
+                            ? { ...e, removed: e.removed.filter((k) => k !== r.key) }
+                            : { ...e, restored: [...e.restored, r.key] },
+                        )
+                      }
+                    >
+                      Add back
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          <Section title="Expenses" count={expenses.length}>
+            {expenses.length ? (
+              <div className="card list">
+                {expenses.map((e) => (
+                  <div key={e.cashId} className="list-row">
+                    <input
+                      className="inline-input"
+                      value={e.label}
+                      aria-label="Expense label"
+                      onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
+                    />
+                    <span className="strong nowrap">{formatMoney(e.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="empty">No expenses in the cash statement for this day.</p>
+            )}
+            {draft!.insurerPayments.length > 0 && (
+              <p className="muted small">
+                Insurer payments today (not in client totals):{' '}
+                {draft!.insurerPayments.map((p) => `${p.name} ${formatMoney(p.amount)}`).join(', ')}
+              </p>
+            )}
+          </Section>
+
+          <div className="confirm-bar">
+            {!template.data && template.isFetched && (
+              <p className="muted small">
+                No report template yet: the day is saved without the Excel file. <Link to="/more/settings">Upload it in Settings</Link>.
+              </p>
+            )}
+            <button type="button" className="button primary block" disabled={Boolean(busy) || !rows.length} onClick={onConfirm}>
+              {busy ?? (template.data ? 'Confirm and generate report' : 'Confirm day')}
+            </button>
+            <p className="muted small center">Confirming takes these sessions off packages and approvals.</p>
+          </div>
+        </>
+      )}
+
+      {editing && (
+        <EditRowDialog
+          row={editing}
+          packages={(packages.data ?? []).filter((p) => p.client_id === editing.clientId && p.status === 'active')}
+          approvals={(approvals.data ?? []).filter((a) => a.client_id === editing.clientId && a.status === 'active')}
+          onSave={(change) => {
+            editRow(editing.key, change)
+            setEditing(null)
+          }}
+          onRemove={() => {
+            update((e) => ({ ...e, removed: [...e.removed, editing.key] }))
+            setEditing(null)
+          }}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      {linking && <LinkClientDialog name={linking.rawName ?? linking.clientName} onClose={() => setLinking(null)} />}
+      {adding && (
+        <AddClientDialog
+          onAdd={(client) => {
+            update((e) => ({
+              ...e,
+              added: [
+                ...e.added,
+                {
+                  key: `added:${crypto.randomUUID()}`,
+                  clientId: client.id,
+                  clientName: client.name,
+                  therapist: null,
+                  slotTime: null,
+                  status: 'walk-in',
+                  billingType: 'per_session',
+                  packageId: null,
+                  approvalId: null,
+                  serialNumber: null,
+                  sessionNo: null,
+                  sheetSessionNo: null,
+                  billed: defaults.perSessionPrice,
+                  collected: 0,
+                  paymentMethod: null,
+                  extraNote: '',
+                  scheduleEntryId: null,
+                  cashIds: [],
+                  rawName: null,
+                  flags: [],
+                },
+              ],
+            }))
+            setAdding(false)
+          }}
+          onClose={() => setAdding(false)}
+        />
+      )}
+    </section>
+  )
+}
+
+const BILLING_TONE: Record<BillingType, 'accent' | 'warn' | 'neutral'> = {
+  insurance: 'accent',
+  package: 'accent',
+  per_session: 'neutral',
+  free: 'neutral',
+}
+
+function RowCard({
+  row: r,
+  onEdit,
+  onLink,
+  onFree,
+  onCame,
+  onRemove,
+}: {
+  row: DayRow
+  onEdit: () => void
+  onLink?: () => void
+  onFree?: () => void
+  onCame?: () => void
+  onRemove?: () => void
+}) {
+  const kinds = new Set(r.flags.map((f) => f.kind))
+  return (
+    <article className="card day-row">
+      <button type="button" className="day-row-main" onClick={onEdit}>
+        <span className="row-text">
+          <span className="strong">{r.clientName}</span>
+          <span className="muted small">
+            {[r.slotTime, r.therapist, r.status === 'walk-in' ? 'not on the schedule' : null].filter(Boolean).join(' · ')}
+          </span>
+          <span className="small">
+            Billed {formatMoney(r.billed)} · Collected {formatMoney(r.collected)}
+            {r.sessionNo ? ` · Session ${r.sessionNo}` : ''}
+            {r.paymentMethod && r.paymentMethod !== 'cash' ? ` · ${r.paymentMethod.toUpperCase()}` : ''}
+          </span>
+        </span>
+        <Badge tone={BILLING_TONE[r.billingType]}>{SECTION_LABEL[r.billingType]}</Badge>
+      </button>
+      {r.flags.length > 0 && (
+        <div className="day-flags">
+          {r.flags.map((f) => (
+            <span key={f.kind} className="flag small">
+              {f.text}
+            </span>
+          ))}
+          <div className="row-buttons">
+            {(kinds.has('unmatched') || kinds.has('uncertain-name')) && onLink && (
+              <button type="button" className="button small-button primary" onClick={onLink}>
+                Who is this?
+              </button>
+            )}
+            {kinds.has('not-paid') && onFree && (
+              <button type="button" className="button small-button" onClick={onFree}>
+                Mark as Free
+              </button>
+            )}
+            {kinds.has('no-status') && onCame && (
+              <button type="button" className="button small-button" onClick={onCame}>
+                Came
+              </button>
+            )}
+            {(kinds.has('no-status') || kinds.has('not-paid')) && onRemove && (
+              <button type="button" className="button small-button ghost danger" onClick={onRemove}>
+                Didn’t come
+              </button>
+            )}
+            <button type="button" className="button small-button ghost" onClick={onEdit}>
+              Edit
+            </button>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
+function EditRowDialog({
+  row,
+  packages,
+  approvals,
+  onSave,
+  onRemove,
+  onClose,
+}: {
+  row: DayRow
+  packages: PackageWithBalance[]
+  approvals: ApprovalWithBalance[]
+  onSave: (change: RowEdit) => void
+  onRemove: () => void
+  onClose: () => void
+}) {
+  const dialog = useRef<HTMLDialogElement>(null)
+  const [billing, setBilling] = useState<BillingType>(row.billingType)
+  const [packageId, setPackageId] = useState(row.packageId ?? packages[0]?.id ?? '')
+  const [approvalId, setApprovalId] = useState(row.approvalId ?? approvals[0]?.id ?? '')
+  const [billed, setBilled] = useState(numberText(row.billed))
+  const [collected, setCollected] = useState(numberText(row.collected))
+  const [sessionNo, setSessionNo] = useState(numberText(row.sessionNo))
+  const [therapist, setTherapist] = useState(row.therapist ?? '')
+  const [note, setNote] = useState(row.extraNote)
+  useEffect(() => dialog.current?.showModal(), [])
+
+  return (
+    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label={`Edit ${row.clientName}`}>
+      <div className="sheet-head">
+        <p className="strong">{row.clientName}</p>
+        <button type="button" className="button ghost" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          onSave({
+            billingType: billing,
+            packageId: billing === 'package' ? packageId || null : null,
+            approvalId: billing === 'insurance' ? approvalId || null : null,
+            billed: parseNumber(billed) ?? 0,
+            collected: parseNumber(collected) ?? 0,
+            sessionNo: parseNumber(sessionNo),
+            therapist: therapist.trim() || null,
+            extraNote: note,
+          })
+        }}
+      >
+        <label className="field">
+          <span>Billing</span>
+          <select value={billing} onChange={(e) => setBilling(e.target.value as BillingType)}>
+            {SECTION_ORDER.map((t) => (
+              <option key={t} value={t}>
+                {SECTION_LABEL[t]}
+              </option>
+            ))}
+          </select>
+        </label>
+        {billing === 'package' && (
+          <label className="field">
+            <span>Package</span>
+            <select value={packageId} onChange={(e) => setPackageId(e.target.value)}>
+              {!packages.length && <option value="">No active package</option>}
+              {packages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.sessions_total} sessions · {p.sessions_remaining} left
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        {billing === 'insurance' && (
+          <label className="field">
+            <span>Approval</span>
+            <select value={approvalId} onChange={(e) => setApprovalId(e.target.value)}>
+              {!approvals.length && <option value="">No active approval</option>}
+              {approvals.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.insurer} · {a.sessions_remaining} left
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="field-row">
+          <label className="field">
+            <span>Billed ($)</span>
+            <input inputMode="decimal" value={billed} onChange={(e) => setBilled(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Collected ($)</span>
+            <input inputMode="decimal" value={collected} onChange={(e) => setCollected(e.target.value)} />
+          </label>
+        </div>
+        <div className="field-row">
+          <label className="field">
+            <span>Session no.</span>
+            <input inputMode="numeric" value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} />
+          </label>
+          <label className="field">
+            <span>Therapist</span>
+            <input value={therapist} onChange={(e) => setTherapist(e.target.value)} />
+          </label>
+        </div>
+        <label className="field">
+          <span>Extra note</span>
+          <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+        </label>
+        <button type="submit" className="button primary block">
+          Save
+        </button>
+        <button type="button" className="button ghost danger block" onClick={onRemove}>
+          Remove from this day
+        </button>
+      </form>
+    </dialog>
+  )
+}
+
+function AddClientDialog({ onAdd, onClose }: { onAdd: (c: { id: string; name: string }) => void; onClose: () => void }) {
+  const clients = useClients()
+  const dialog = useRef<HTMLDialogElement>(null)
+  const [query, setQuery] = useState('')
+  useEffect(() => dialog.current?.showModal(), [])
+  const results = useMemo(() => searchClients(clients.data ?? [], query).results, [clients.data, query])
+  return (
+    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label="Add a client to this day">
+      <div className="sheet-head">
+        <p className="strong">Add a client to this day</p>
+        <button type="button" className="button ghost" onClick={onClose}>
+          Close
+        </button>
+      </div>
+      <input className="search" type="search" placeholder="Search clients" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+      <div className="card list sheet-list">
+        {results.map((c) => (
+          <button key={c.id} type="button" className="list-row link as-button" onClick={() => onAdd(c)}>
+            <span>{c.name}</span>
+            <span className="chevron">›</span>
+          </button>
+        ))}
+        {query && !results.length && <p className="empty pad">No client found.</p>}
+      </div>
+    </dialog>
+  )
+}
+
+function ConfirmedDay({
+  date,
+  sessions,
+  confirmedAt,
+  hasReport,
+  busy,
+  onDownload,
+  onReopen,
+}: {
+  date: string
+  sessions: Array<{ id: string; client_name: string | null; billing_type: string; billed: number; collected: number; session_no: number | null; therapist: string | null }>
+  confirmedAt: string
+  hasReport: boolean
+  busy: string | null
+  onDownload: () => void
+  onReopen: () => void
+}) {
+  return (
+    <>
+      <div className="card day-summary">
+        <div>
+          <p className="strong">Confirmed ✓</p>
+          <p className="muted small">
+            {formatDate(date)} · {new Date(confirmedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} ·{' '}
+            {plural(sessions.length, 'client')}
+          </p>
+        </div>
+        <Badge tone="accent">Done</Badge>
+      </div>
+      {hasReport && (
+        <button type="button" className="button primary block" onClick={onDownload}>
+          Download the report
+        </button>
+      )}
+      {SECTION_ORDER.map((type) => {
+        const list = sessions.filter((s) => s.billing_type === type)
+        if (!list.length) return null
+        return (
+          <Section key={type} title={SECTION_LABEL[type]} count={list.length}>
+            <div className="card list">
+              {list.map((s) => (
+                <div key={s.id} className="list-row">
+                  <span className="row-text">
+                    <span>{s.client_name}</span>
+                    <span className="muted small">{[s.therapist, s.session_no ? `session ${s.session_no}` : null].filter(Boolean).join(' · ')}</span>
+                  </span>
+                  <span className="muted small nowrap">
+                    {formatMoney(Number(s.collected))} / {formatMoney(Number(s.billed))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )
+      })}
+      <button type="button" className="button ghost block" disabled={Boolean(busy)} onClick={onReopen}>
+        {busy ?? 'Reopen this day to change it'}
+      </button>
+    </>
+  )
+}

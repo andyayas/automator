@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { BalanceCard } from '../components/BalanceCard'
+import { DailyReviewCard } from '../components/DailyReviewCard'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import { deleteApproval, deletePackage, setStatus, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
 import { balanceAlerts } from '../lib/alerts'
@@ -83,6 +84,10 @@ export function TodayPage() {
   return (
     <TodayFrame heading={heading}>
       {actionError && <p className="error" role="alert">{actionError}</p>}
+
+      <Section title="Daily review">
+        <DailyReviewCard />
+      </Section>
 
       {noClients && (
         <div className="card">

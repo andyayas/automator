@@ -20,11 +20,13 @@
     "gen:types": "supabase gen types typescript --linked --schema public > src/lib/database.types.ts",
     "test:integration": "INTEGRATION=1 vitest run src/lib/api.integration.test.ts",
     "seed": "tsx --env-file=.env.local scripts/seed-golive.ts",
-    "check:names": "tsx scripts/scan-real-names.ts --all"
+    "check:names": "tsx scripts/scan-real-names.ts --all",
+    "compare:reports": "tsx --env-file=.env.local scripts/compare-reports.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "2.117.3",
     "@tanstack/react-query": "5.104.3",
+    "exceljs": "4.4.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "react-router": "8.4.0",
@@ -44,5 +46,8 @@
     "typescript": "6.0.3",
     "vite": "8.3.0",
     "vitest": "5.0.4"
+  },
+  "overrides": {
+    "uuid": "11.1.1"
   }
 }

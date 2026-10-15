@@ -704,6 +704,7 @@ async function main() {
       per_session: Math.round(p.priceTotal / p.sessionsTotal),
       purchased_on: p.purchasedOn,
       source_voucher: p.voucher,
+      amount_paid: p.purchasedOn ? p.priceTotal : null,
       sessions_used_before_app: p.used,
       used_before_app_as_of: until,
       status: 'proposed',

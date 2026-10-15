@@ -180,6 +180,7 @@ export type Database = {
           id: string
           notes: string | null
           owner_id: string
+          report_generated_at: string | null
           report_storage_path: string | null
           updated_at: string
         }
@@ -190,6 +191,7 @@ export type Database = {
           id?: string
           notes?: string | null
           owner_id?: string
+          report_generated_at?: string | null
           report_storage_path?: string | null
           updated_at?: string
         }
@@ -200,6 +202,7 @@ export type Database = {
           id?: string
           notes?: string | null
           owner_id?: string
+          report_generated_at?: string | null
           report_storage_path?: string | null
           updated_at?: string
         }
@@ -212,6 +215,7 @@ export type Database = {
           billing_type: string
           cash_transaction_id: string | null
           client_id: string | null
+          client_name: string | null
           collected: number
           confirmed: boolean
           created_at: string
@@ -232,6 +236,7 @@ export type Database = {
           billing_type: string
           cash_transaction_id?: string | null
           client_id?: string | null
+          client_name?: string | null
           collected?: number
           confirmed?: boolean
           created_at?: string
@@ -252,6 +257,7 @@ export type Database = {
           billing_type?: string
           cash_transaction_id?: string | null
           client_id?: string | null
+          client_name?: string | null
           collected?: number
           confirmed?: boolean
           created_at?: string
@@ -478,6 +484,7 @@ export type Database = {
       }
       packages: {
         Row: {
+          amount_paid: number | null
           client_id: string
           created_at: string
           id: string
@@ -494,6 +501,7 @@ export type Database = {
           used_before_app_as_of: string | null
         }
         Insert: {
+          amount_paid?: number | null
           client_id: string
           created_at?: string
           id?: string
@@ -510,6 +518,7 @@ export type Database = {
           used_before_app_as_of?: string | null
         }
         Update: {
+          amount_paid?: number | null
           client_id?: string
           created_at?: string
           id?: string
@@ -730,6 +739,7 @@ export type Database = {
       }
       package_balances: {
         Row: {
+          amount_paid: number | null
           client_id: string | null
           created_at: string | null
           id: string | null

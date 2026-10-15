@@ -27,4 +27,9 @@ export const SETTING = {
   reminderTemplate: 'reminder_template',
   staffNames: 'staff_names',
   sheetLinks: 'sheet_links',
+  perSessionPrice: 'per_session_price',
+  insuranceBilled: 'insurance_billed',
 } as const
+
+/** Used when a setting hasn't been set yet. */
+export const DEFAULT_PRICES = { perSessionPrice: 45, insuranceBilled: 25 }
