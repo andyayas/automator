@@ -3,6 +3,8 @@ samples/
 *.xlsx
 *.xls
 *.csv
+# The one spreadsheet that belongs in the repo (blank report template).
+!src/assets/daily-report-template.xlsx
 
 # Secrets
 .env
