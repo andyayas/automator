@@ -585,6 +585,7 @@ export type Database = {
       schedule_entries: {
         Row: {
           billing_note: string | null
+          cell_ref: string | null
           client_id: string | null
           created_at: string
           date: string
@@ -592,10 +593,13 @@ export type Database = {
           import_id: string | null
           inline_amount: number | null
           is_non_client: boolean
+          match_kind: string | null
+          name_key: string | null
           owner_id: string
           parsed_name: string | null
           raw_text: string
           session_no: number | null
+          sheet_tab: string | null
           slot_time: string
           status: string
           therapist: string
@@ -603,6 +607,7 @@ export type Database = {
         }
         Insert: {
           billing_note?: string | null
+          cell_ref?: string | null
           client_id?: string | null
           created_at?: string
           date: string
@@ -610,10 +615,13 @@ export type Database = {
           import_id?: string | null
           inline_amount?: number | null
           is_non_client?: boolean
+          match_kind?: string | null
+          name_key?: string | null
           owner_id?: string
           parsed_name?: string | null
           raw_text: string
           session_no?: number | null
+          sheet_tab?: string | null
           slot_time: string
           status?: string
           therapist: string
@@ -621,6 +629,7 @@ export type Database = {
         }
         Update: {
           billing_note?: string | null
+          cell_ref?: string | null
           client_id?: string | null
           created_at?: string
           date?: string
@@ -628,10 +637,13 @@ export type Database = {
           import_id?: string | null
           inline_amount?: number | null
           is_non_client?: boolean
+          match_kind?: string | null
+          name_key?: string | null
           owner_id?: string
           parsed_name?: string | null
           raw_text?: string
           session_no?: number | null
+          sheet_tab?: string | null
           slot_time?: string
           status?: string
           therapist?: string

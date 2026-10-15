@@ -9,7 +9,10 @@ import { ClientsPage } from './pages/clients/ClientsPage'
 import { PackageFormPage } from './pages/clients/PackageFormPage'
 import { ImportContactsPage } from './pages/ImportContactsPage'
 import { MorePage } from './pages/MorePage'
-import { RemindersPage, SchedulePage } from './pages/placeholders'
+import { RemindersPage } from './pages/RemindersPage'
+import { ScheduleImportPage } from './pages/ScheduleImportPage'
+import { SchedulePage } from './pages/SchedulePage'
+import { SettingsPage } from './pages/SettingsPage'
 import { TodayPage } from './pages/TodayPage'
 
 // Used with a hash router in the app (GitHub Pages has no SPA fallback)
@@ -25,6 +28,7 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <TodayPage /> },
       { path: 'schedule', element: <SchedulePage /> },
+      { path: 'schedule/import', element: <ScheduleImportPage /> },
       { path: 'clients', element: <ClientsPage /> },
       { path: 'clients/new', element: <ClientFormPage /> },
       { path: 'clients/:clientId', element: <ClientDetailPage /> },
@@ -36,6 +40,7 @@ export const routes: RouteObject[] = [
       { path: 'reminders', element: <RemindersPage /> },
       { path: 'more', element: <MorePage /> },
       { path: 'more/import-contacts', element: <ImportContactsPage /> },
+      { path: 'more/settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

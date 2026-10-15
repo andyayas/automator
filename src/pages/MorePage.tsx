@@ -20,10 +20,15 @@ export function MorePage() {
             ›
           </span>
         </Link>
-        <div className="list-row">
-          <span>Settings</span>
-          <span className="muted">Coming soon</span>
-        </div>
+        <Link to="/more/settings" className="list-row link">
+          <span className="row-text">
+            <span>Settings</span>
+            <span className="muted small">Reminder message, sender name, sheet links, staff</span>
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
+        </Link>
         <div className="list-row">
           <span>Export all data</span>
           <span className="muted">Coming soon</span>

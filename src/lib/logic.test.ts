@@ -1,6 +1,7 @@
 // Synthetic data only.
 import { describe, expect, it } from 'vitest'
 import { balanceAlerts } from './alerts'
+import { activeByClient, bookingContext } from './booking-context'
 import type { ApprovalWithBalance, Client, PackageWithBalance } from './api'
 import { planContactsImport } from './contacts-plan'
 import { daysBetween, formatMoney, parseNumber, perSessionValue } from './format'
@@ -151,5 +152,32 @@ describe('format helpers', () => {
     expect(formatMoney(37.5)).toBe('$37.50')
     expect(daysBetween('2026-10-15', '2026-10-20')).toBe(5)
     expect(daysBetween('2026-10-30', '2026-11-02')).toBe(3)
+  })
+})
+
+describe('bookingContext', () => {
+  const active = activeByClient(
+    [pkg('p-last', 1), { ...pkg('p-other', 5), client_id: 'c2' }],
+    [{ ...approval('a1', 4, '2026-10-18'), client_id: 'c3' }],
+  )
+
+  it('shows the package and warns on the last session', () => {
+    expect(bookingContext('c1', '2026-10-16', null, active)).toEqual({ label: 'Package', remaining: 1, alerts: [{ tone: 'warn', text: 'Last session' }] })
+  })
+
+  it('shows the approval and warns when it is about to expire', () => {
+    expect(bookingContext('c3', '2026-10-16', null, active)).toMatchObject({
+      label: 'Insurance · Test Insurer',
+      remaining: 4,
+      alerts: [{ tone: 'warn', text: 'Approval expires 18 Oct' }],
+    })
+    expect(bookingContext('c3', '2026-10-20', null, active)!.alerts[0]).toEqual({ tone: 'danger', text: 'Approval expired 18 Oct' })
+  })
+
+  it('flags an insurance booking with no approval, and handles free and per-session', () => {
+    expect(bookingContext('c9', '2026-10-16', 'insurance', active)!.alerts).toEqual([{ tone: 'warn', text: 'No active approval' }])
+    expect(bookingContext('c9', '2026-10-16', null, active)).toEqual({ label: 'Per session', remaining: null, alerts: [] })
+    expect(bookingContext('c1', '2026-10-16', 'free', active)!.label).toBe('Free')
+    expect(bookingContext(null, '2026-10-16', null, active)).toBeNull()
   })
 })

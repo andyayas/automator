@@ -1,5 +1,6 @@
 import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
+import * as sched from './schedule-api'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,6 +18,10 @@ export const keys = {
   approvals: ['approvals'] as const,
   approval: (id: string) => ['approvals', 'one', id] as const,
   insurers: ['insurers'] as const,
+  schedule: (date: string) => ['schedule', date] as const,
+  reminders: (date: string) => ['reminders', date] as const,
+  settings: ['settings'] as const,
+  patterns: ['patterns'] as const,
 }
 
 export const useClients = () =>
@@ -37,6 +42,13 @@ export const useApproval = (id: string) =>
   useQuery({ queryKey: keys.approval(id), queryFn: () => api.fetchApproval(id), enabled: Boolean(id) })
 export const useInsurers = () => useQuery({ queryKey: keys.insurers, queryFn: api.fetchInsurers })
 
+export const useScheduleDay = (date: string) =>
+  useQuery({ queryKey: keys.schedule(date), queryFn: () => sched.fetchScheduleDay(date) })
+export const useReminders = (date: string) =>
+  useQuery({ queryKey: keys.reminders(date), queryFn: () => sched.fetchReminders(date) })
+export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: sched.fetchSettings })
+export const usePatterns = () => useQuery({ queryKey: keys.patterns, queryFn: sched.fetchPatterns })
+
 /** Refetch everything that shows packages or approvals after a change. */
 export function useInvalidate() {
   const client = useQueryClient()
@@ -48,6 +60,13 @@ export function useInvalidate() {
         client.invalidateQueries({ queryKey: keys.insurers }),
       ]),
     clients: () => client.invalidateQueries({ queryKey: keys.clients }),
+    schedule: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: ['schedule'] }),
+        client.invalidateQueries({ queryKey: ['reminders'] }),
+      ]),
+    settings: () =>
+      Promise.all([client.invalidateQueries({ queryKey: keys.settings }), client.invalidateQueries({ queryKey: keys.patterns })]),
     client: (id: string) =>
       Promise.all([
         client.invalidateQueries({ queryKey: keys.client(id) }),

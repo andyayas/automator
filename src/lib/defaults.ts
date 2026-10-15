@@ -1,0 +1,30 @@
+// Starting values copied into her account the first time they're needed.
+// She edits them in Settings; the app never resets them.
+
+export { DEFAULT_NON_CLIENT_PATTERNS } from './schedule-cell'
+export { DEFAULT_REMINDER_TEMPLATE } from './reminders'
+
+/** Expense label mapping (CLAUDE.md), keyed by "name|description" lowercased. */
+export const DEFAULT_EXPENSE_LABELS: Record<string, string> = {
+  'alfa|phone recharge': 'Alfa phone recharge',
+  'bartartine|coffee': 'Coffee',
+  'coco laundry|laundry': 'Laundry',
+  'cream|cream for the team': 'Cream',
+  'maliks|ink+stationery': 'Maliks Ink+Stationery',
+  'ogero|fiber internet': 'Fiber',
+  'sannine water|5 boxes of water': 'Water 5 boxes',
+  'sannine water|10 boxes of water': 'Water 10 boxes',
+  'sclub|rent': 'Rent',
+  'toters|pantry': 'Pantry toters',
+  'univest|medical rolls': 'Medical Rolls',
+  'we for media|social media': 'Social media',
+}
+
+/** Setting keys (settings table, key -> JSON). */
+export const SETTING = {
+  defaultsSeeded: 'defaults_seeded',
+  senderName: 'sender_name',
+  reminderTemplate: 'reminder_template',
+  staffNames: 'staff_names',
+  sheetLinks: 'sheet_links',
+} as const
