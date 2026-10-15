@@ -24,11 +24,18 @@ export function ImportContactsPage() {
     setError(null)
     setStep({ kind: 'reading' })
     try {
-      // Excel parsing is only loaded on this screen.
-      const [{ read }, { parseContacts }] = await Promise.all([import('xlsx'), import('../lib/contacts-xlsx')])
-      const workbook = read(await file.arrayBuffer(), { type: 'array' })
-      const parsed = parseContacts(workbook)
-      const plan = planContactsImport(parsed.contacts, await fetchAllClients())
+      const isVcard = /\.vcf$/i.test(file.name) || /^BEGIN:VCARD/i.test((await file.slice(0, 20).text()).trim())
+      let parsed: { contacts: import('../lib/contacts').ContactRow[]; duplicates: number }
+      if (isVcard) {
+        // A contacts export from the clinic phone.
+        const { parseVcard } = await import('../lib/vcard')
+        parsed = parseVcard(await file.text())
+      } else {
+        // Excel parsing is only loaded on this screen.
+        const [{ read }, { parseContacts }] = await Promise.all([import('xlsx'), import('../lib/contacts-xlsx')])
+        parsed = parseContacts(read(await file.arrayBuffer(), { type: 'array' }))
+      }
+      const plan = planContactsImport(parsed.contacts, await fetchAllClients(), isVcard ? 'phone' : 'sheet')
       setStep({
         kind: 'preview',
         plan,
@@ -54,7 +61,7 @@ export function ImportContactsPage() {
     try {
       await applyContactsImport(plan, (done, total) => setStep({ kind: 'importing', done, total }))
       await invalidate.clients()
-      setStep({ kind: 'done', added: plan.inserts.length, updated: plan.phoneUpdates.length })
+      setStep({ kind: 'done', added: plan.inserts.length, updated: plan.phoneUpdates.length + plan.phoneOverrides.length })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setStep({ kind: 'pick' })
@@ -67,8 +74,9 @@ export function ImportContactsPage() {
 
       <div className="card">
         <p>
-          Upload the schedule export (<span className="strong">.xlsx</span>). The app reads its{' '}
-          <span className="strong">Contacts</span> tab on this device and adds new clients. For existing clients it only
+          Upload the schedule export (<span className="strong">.xlsx</span>, its <span className="strong">Contacts</span> tab)
+          or a contacts export from the clinic phone (<span className="strong">.vcf</span>). It is read on this device and new
+          clients are added. For existing clients it only
           refreshes the Contacts phone. Names and phone fixes you made in the app are kept.
         </p>
         <p className="muted small">The file itself is not uploaded or changed.</p>
@@ -81,7 +89,7 @@ export function ImportContactsPage() {
           {step.kind === 'reading' ? 'Reading…' : 'Choose file'}
           <input
             type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            accept=".xlsx,.vcf,text/vcard,text/x-vcard,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             disabled={step.kind === 'reading'}
             onChange={(e) => {
               void onFile(e.target.files?.[0])
@@ -97,11 +105,30 @@ export function ImportContactsPage() {
           <ul className="summary">
             <li>{plural(step.plan.inserts.length, 'new client')}</li>
             <li>{plural(step.plan.phoneUpdates.length, 'phone update')}</li>
+            {step.plan.phoneOverrides.length > 0 && (
+              <li>{plural(step.plan.phoneOverrides.length, 'number')} updated to the one on the phone</li>
+            )}
+            {step.plan.aliases.length > 0 && (
+              <li>{plural(step.plan.aliases.length, 'contact')} saved under another name for a client with the same number</li>
+            )}
             <li>{step.plan.unchanged} unchanged</li>
             {step.noPhone > 0 && <li className="muted">{plural(step.noPhone, 'contact')} without a phone</li>}
             {step.duplicates > 0 && <li className="muted">{plural(step.duplicates, 'duplicate name')} merged</li>}
           </ul>
-          {step.plan.inserts.length + step.plan.phoneUpdates.length > 0 ? (
+          {step.plan.skipped.length > 0 && (
+            <details className="details">
+              <summary>{plural(step.plan.skipped.length, 'contact')} not added: very close to an existing client</summary>
+              <ul>
+                {step.plan.skipped.map((x) => (
+                  <li key={x.row.key} className="small">
+                    “{x.row.name}” looks like “{x.closest}”
+                  </li>
+                ))}
+              </ul>
+              <p className="muted small">If one is really a different person, add them with Clients → Add.</p>
+            </details>
+          )}
+          {step.plan.inserts.length + step.plan.phoneUpdates.length + step.plan.phoneOverrides.length + step.plan.aliases.length > 0 ? (
             <button type="button" className="button primary block" onClick={() => onImport(step.plan)}>
               Import
             </button>

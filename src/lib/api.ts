@@ -178,9 +178,13 @@ export async function fetchClientSessions(clientId: string): Promise<DaySession[
 // ---------------------------------------------------------------------------
 
 export async function applyContactsImport(plan: ContactsPlan, onProgress?: (done: number, total: number) => void) {
-  const total = plan.inserts.length + plan.phoneUpdates.length
+  const total = plan.inserts.length + plan.phoneUpdates.length + plan.phoneOverrides.length + plan.aliases.length
   let done = 0
   const chunk = 500
+  const step = (n: number) => {
+    done += n
+    onProgress?.(done, total)
+  }
   for (let i = 0; i < plan.inserts.length; i += chunk) {
     const rows = plan.inserts
       .slice(i, i + chunk)
@@ -189,18 +193,34 @@ export async function applyContactsImport(plan: ContactsPlan, onProgress?: (done
       .from('clients')
       .upsert(rows, { onConflict: 'owner_id,contacts_key', ignoreDuplicates: true })
     fail(error)
-    done += rows.length
-    onProgress?.(done, total)
+    step(rows.length)
   }
   for (let i = 0; i < plan.phoneUpdates.length; i += chunk) {
     // Upsert needs the NOT NULL columns, so send the client's current name back unchanged.
-    const rows = plan.phoneUpdates
-      .slice(i, i + chunk)
-      .map(({ client, phone }) => ({ id: client.id, name: client.name, contacts_key: client.contacts_key, phone_contacts: phone }))
+    const rows = plan.phoneUpdates.slice(i, i + chunk).map(({ client, phone, contactsKey }) => ({
+      id: client.id,
+      name: client.name,
+      contacts_key: contactsKey ?? client.contacts_key,
+      phone_contacts: phone,
+    }))
     const { error } = await supabase.from('clients').upsert(rows, { onConflict: 'id' })
     fail(error)
-    done += rows.length
-    onProgress?.(done, total)
+    step(rows.length)
+  }
+  for (let i = 0; i < plan.phoneOverrides.length; i += chunk) {
+    const rows = plan.phoneOverrides
+      .slice(i, i + chunk)
+      .map(({ client, phone }) => ({ id: client.id, name: client.name, contacts_key: client.contacts_key, phone_override: phone }))
+    const { error } = await supabase.from('clients').upsert(rows, { onConflict: 'id' })
+    fail(error)
+    step(rows.length)
+  }
+  if (plan.aliases.length) {
+    const { error } = await supabase
+      .from('client_aliases')
+      .upsert(plan.aliases.map((a) => ({ client_id: a.clientId, alias: a.alias })), { onConflict: 'owner_id,alias', ignoreDuplicates: true })
+    fail(error)
+    step(plan.aliases.length)
   }
 }
 

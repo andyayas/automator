@@ -108,9 +108,9 @@ describe('searchClients', () => {
 
 describe('planContactsImport', () => {
   const existing = [
-    { id: 'a', name: 'Renamed By Her', contacts_key: 'jane testerson', phone_contacts: '96171000001', phone_override: '96170999999' },
-    { id: 'b', name: 'Omar Sample', contacts_key: 'omar sample', phone_contacts: '9613000003', phone_override: null },
-    { id: 'c', name: 'Manual Client', contacts_key: null, phone_contacts: null, phone_override: null },
+    { id: 'a', name: 'Renamed By Her', contacts_key: 'jane testerson', phone_contacts: '96171000001', phone_override: '96170999999', phone: '96170999999' },
+    { id: 'b', name: 'Omar Sample', contacts_key: 'omar sample', phone_contacts: '9613000003', phone_override: null, phone: '9613000003' },
+    { id: 'c', name: 'Manual Client', contacts_key: null, phone_contacts: null, phone_override: null, phone: null },
   ] as Client[]
 
   it('adds new contacts and refreshes only the Contacts phone of existing ones', () => {
@@ -180,5 +180,42 @@ describe('bookingContext', () => {
     expect(bookingContext('c9', '2026-10-16', null, active)).toEqual({ label: 'Per session', remaining: null, alerts: [] })
     expect(bookingContext('c1', '2026-10-16', 'free', active)!.label).toBe('Free')
     expect(bookingContext(null, '2026-10-16', null, active)).toBeNull()
+  })
+})
+
+describe('planContactsImport from a phone export', () => {
+  const clients = [
+    { id: 'a', name: 'Jane Testerson', contacts_key: 'jane testerson', phone_contacts: '96171000001', phone_override: null, phone: '96171000001' },
+    { id: 'b', name: 'Added By Hand', contacts_key: null, phone_contacts: null, phone_override: null, phone: null },
+    { id: 'c', name: 'Omar Sample', contacts_key: 'omar sample', phone_contacts: '9613000003', phone_override: null, phone: '9613000003' },
+  ] as Client[]
+
+  const plan = planContactsImport(
+    [
+      { key: 'jane testerson', name: 'Jane Testerson', phone: '96171999999' },
+      { key: 'added by hand', name: 'Added By Hand', phone: '96176000004' },
+      { key: 'omar s', name: 'Omar S', phone: '9613000003' },
+      { key: 'jane testersen', name: 'Jane Testersen', phone: '96170123456' },
+      { key: 'brand new', name: 'Brand New', phone: '96171222333' },
+    ],
+    clients,
+    'phone',
+  )
+
+  it('fills the phone of a client added by hand instead of adding a duplicate', () => {
+    expect(plan.phoneUpdates).toEqual([{ client: clients[1], phone: '96176000004', contactsKey: 'added by hand' }])
+  })
+
+  it("takes the phone's newer number for an existing client", () => {
+    expect(plan.phoneOverrides).toEqual([{ client: clients[0], phone: '96171999999' }])
+  })
+
+  it('saves another name for the same number, and holds back near-identical names', () => {
+    expect(plan.aliases).toEqual([{ clientId: 'c', alias: 'omar s' }])
+    expect(plan.skipped).toEqual([{ row: { key: 'jane testersen', name: 'Jane Testersen', phone: '96170123456' }, closest: 'Jane Testerson' }])
+  })
+
+  it('adds only the genuinely new contact', () => {
+    expect(plan.inserts.map((c) => c.key)).toEqual(['brand new'])
   })
 })

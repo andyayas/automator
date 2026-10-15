@@ -4,6 +4,7 @@ import { utils } from 'xlsx'
 import { parseContacts } from './contacts-xlsx'
 import { createNameMatcher, displayName, normalizeName, tokenSortRatio } from './names'
 import { formatPhone, normalizePhone } from './phone'
+import { parseVcard } from './vcard'
 
 describe('normalizeName', () => {
   it('trims, lowercases, collapses spaces and strips accents and punctuation', () => {
@@ -125,5 +126,28 @@ describe('parseContacts', () => {
 
   it('explains a file without a Contacts tab', () => {
     expect(() => parseContacts(workbook([['a']], 'Other'))).toThrow(/Contacts/)
+  })
+})
+
+describe('parseVcard', () => {
+  const vcf = [
+    'BEGIN:VCARD', 'VERSION:2.1', 'N:Testerson;Jane;;;', 'FN:Jane Testerson', 'TEL;HOME:01 234 567', 'TEL;CELL:03 123 456', 'END:VCARD',
+    'BEGIN:VCARD', 'VERSION:2.1', 'N;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:;=C3=89lie;;;', 'FN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:=C3=89lie Sampl=',
+    'e', 'TEL;CELL:+961 71 000 002', 'END:VCARD',
+    'BEGIN:VCARD', 'VERSION:3.0', 'FN:Omar Example', 'TEL;TYPE=CELL:+44 7700 900123', 'END:VCARD',
+    'BEGIN:VCARD', 'VERSION:3.0', 'FN:jane testerson', 'TEL:71 999 888', 'END:VCARD',
+    'BEGIN:VCARD', 'VERSION:3.0', 'FN:No Phone Person', 'END:VCARD',
+  ].join('\r\n')
+
+  it('reads names, decodes accents, and prefers the mobile number', () => {
+    const r = parseVcard(vcf)
+    expect(r.contacts).toEqual([
+      { key: 'jane testerson', name: 'Jane Testerson', phone: '9613123456' },
+      { key: 'elie sample', name: 'Élie Sample', phone: '96171000002' },
+      { key: 'omar example', name: 'Omar Example', phone: '447700900123' },
+      { key: 'no phone person', name: 'No Phone Person', phone: null },
+    ])
+    expect(r.duplicates).toBe(1)
+    expect(r.withoutPhone).toBe(1)
   })
 })
