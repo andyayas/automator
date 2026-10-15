@@ -29,7 +29,13 @@ export type CashRow = {
   sourceKey: string
 }
 
-export type CashParseResult = { rows: CashRow[]; skipped: number; sheets: string[] }
+export type CashParseResult = {
+  rows: CashRow[]
+  skipped: number
+  sheets: string[]
+  /** Dates corrected because the year was clearly mistyped (e.g. 2029 in a 2026 file). */
+  fixedDates: string[]
+}
 
 const HEADERS: Record<string, keyof Columns> = {
   date: 'date',
@@ -47,8 +53,7 @@ const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', '
 
 export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string[] } = {}): CashParseResult {
   const insurers = (opts.insurers ?? []).map(normalizeName).filter(Boolean)
-  const rows: CashRow[] = []
-  const seenKeys = new Map<string, number>()
+  const rows: Array<Omit<CashRow, 'sourceKey'> & { baseKey: (date: string) => string }> = []
   let skipped = 0
   const sheets: string[] = []
 
@@ -103,13 +108,9 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
                   ? 'session'
                   : 'other'
 
-      const baseKey = voucher
-        ? `${currentDate}|${voucher}`
-        : `${currentDate}|${name}|${normalizeName(description)}|${debit ?? credit ?? descAmount ?? ''}`
-      const n = (seenKeys.get(baseKey) ?? 0) + 1
-      seenKeys.set(baseKey, n)
-
+      const contentKey = `${name}|${normalizeName(description)}|${debit ?? credit ?? descAmount ?? ''}`
       rows.push({
+        baseKey: (date) => (voucher ? `${date}|${voucher}` : `${date}|${contentKey}`),
         sheet,
         row: i + 1,
         date: currentDate,
@@ -122,11 +123,33 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
         descAmount,
         kind,
         packageSessions: pkg ? Number(pkg[2]) : null,
-        sourceKey: n === 1 ? baseKey : `${baseKey}#${n}`,
       })
     }
   }
-  return { rows, skipped, sheets }
+
+  // A year that differs from the rest of the file, in a tab named after that
+  // date's month, is a typo (2029-03-28 in "March" of a 2026 file).
+  const yearCounts = new Map<string, number>()
+  for (const r of rows) yearCounts.set(r.date.slice(0, 4), (yearCounts.get(r.date.slice(0, 4)) ?? 0) + 1)
+  const mainYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+  const fixedDates: string[] = []
+  for (const r of rows) {
+    const month = Number(r.date.slice(5, 7)) - 1
+    if (mainYear && !r.date.startsWith(mainYear) && r.sheet.trim().toLowerCase().startsWith(MONTHS[month])) {
+      const fixed = `${mainYear}${r.date.slice(4)}`
+      fixedDates.push(`${r.sheet} row ${r.row}: ${r.date} read as ${fixed}`)
+      r.date = fixed
+    }
+  }
+
+  const seenKeys = new Map<string, number>()
+  const result: CashRow[] = rows.map(({ baseKey, ...r }) => {
+    const key = baseKey(r.date)
+    const n = (seenKeys.get(key) ?? 0) + 1
+    seenKeys.set(key, n)
+    return { ...r, sourceKey: n === 1 ? key : `${key}#${n}` }
+  })
+  return { rows: result, skipped, sheets, fixedDates }
 }
 
 /** Money in for a row: debit, or the amount written in the description (POS etc.). */

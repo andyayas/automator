@@ -29,13 +29,14 @@ describe('parseCashStatement', () => {
         [null, 'TestInsure', 'payment', 'rc4', 900, null],
         ['2-sep-26', 'testd person', 'last payment of the package', 'rc5', 150, null],
         [null, 'teste person', 'single physio session 45$ wish', null, null, null],
+        [new Date(2029, 8, 3), 'testf person', 'single physio session', 'rc6', 45, null],
         [null, null, 'Description', null, null, null],
         [null, null, 'Total', null, 1100, 12],
       ],
     },
     { August: 4 },
   )
-  const { rows, skipped, sheets } = parseCashStatement(wb, { insurers: ['testinsure'] })
+  const { rows, skipped, sheets, fixedDates } = parseCashStatement(wb, { insurers: ['testinsure'] })
   const by = (v: string) => rows.find((r) => r.voucher === v)!
 
   it('finds the columns from the headers, even when they move', () => {
@@ -46,7 +47,7 @@ describe('parseCashStatement', () => {
   it('carries the date down and reads text dates', () => {
     expect(by('rc2').date).toBe('2026-09-01')
     expect(by('rc5').date).toBe('2026-09-02')
-    expect(rows.at(-1)!.date).toBe('2026-09-02')
+    expect(rows.find((r) => r.method === 'transfer')!.date).toBe('2026-09-02')
   })
 
   it('classifies rows', () => {
@@ -56,12 +57,20 @@ describe('parseCashStatement', () => {
     expect(by('rc3')).toMatchObject({ kind: 'insurance_copay' })
     expect(by('rc4')).toMatchObject({ kind: 'insurer_payment' })
     expect(by('rc5')).toMatchObject({ kind: 'package', packageSessions: null })
-    expect(rows.at(-1)).toMatchObject({ voucher: null, method: 'transfer', descAmount: 45, kind: 'session' })
+    expect(by('rc5').date).toBe('2026-09-02')
+    expect(rows.find((r) => r.method === 'transfer')).toMatchObject({ voucher: null, descAmount: 45, kind: 'session' })
   })
 
   it('skips repeated headers and totals', () => {
     expect(skipped).toBe(2)
-    expect(rows).toHaveLength(8)
+    expect(rows).toHaveLength(9)
+  })
+
+  it('fixes a mistyped year and says so', () => {
+    expect(by('rc6').date).toBe('2026-09-03')
+    expect(by('rc6').sourceKey).toBe('2026-09-03|rc6')
+    expect(fixedDates).toHaveLength(1)
+    expect(fixedDates[0]).toMatch(/^September row \d+: 2029-09-03 read as 2026-09-03$/)
   })
 
   it('keys rows by date + voucher so recycled voucher numbers stay distinct', () => {

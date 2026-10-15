@@ -16,7 +16,7 @@
 // are in no file); the report lists the insurance clients to enter by hand.
 // The report contains real names and stays in samples/ (gitignored).
 
-import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline/promises'
 import { createClient } from '@supabase/supabase-js'
@@ -113,6 +113,34 @@ const reportRows: OldReportRow[] = reportFiles.flatMap((f) => {
   const year = Number(/(\d{4})\.xlsx$/.exec(f)![1])
   return parseOldDailyReports(read(readFileSync(f), { type: 'buffer' }), year).flatMap((d) => d.rows)
 })
+// Her answers about names (samples/seed-decisions.json, gitignored):
+//   link:   spelling -> existing client name (the same person)
+//   rename: existing client name -> correct name
+//   same:   groups of spellings that are one new client (first is the name used)
+//   new:    names she confirmed are new clients. Only these are created.
+type Decisions = { link: Record<string, string>; rename: Record<string, string>; same: string[][]; new: string[] }
+const decisionsFile = join(SAMPLES, 'seed-decisions.json')
+const decisions: Decisions = {
+  link: {},
+  rename: {},
+  same: [],
+  new: [],
+  ...(existsSync(decisionsFile) ? (JSON.parse(readFileSync(decisionsFile, 'utf8')) as Partial<Decisions>) : {}),
+}
+
+/** Adds her "link" decisions to the alias map, resolving each target to a client id. */
+function withLinks(candidates: Array<{ id: string; name: string }>, aliases: Map<string, string> = new Map()) {
+  const byName = new Map(candidates.map((c) => [normalizeName(c.name), c.id]))
+  const out = new Map(aliases)
+  const missing: string[] = []
+  for (const [spelling, target] of Object.entries(decisions.link)) {
+    const id = byName.get(normalizeName(target)) ?? aliases.get(normalizeName(target))
+    if (id) out.set(normalizeName(spelling), id)
+    else missing.push(`"${spelling}" → "${target}" (no client called "${target}")`)
+  }
+  return { aliases: out, missing }
+}
+
 const statementFiles = samplesMatching(/^Statement of Account .*\.xlsx$/)
 const statementRows = statementFiles.flatMap(readStatement)
 const lastReportDate = reportRows.map((r) => r.date).sort().at(-1) ?? '0000-00-00'
@@ -136,12 +164,14 @@ type Proposal = {
   notes: string[]
 }
 
-type NewClient = { id: string; name: string; spellings: Set<string>; sources: Set<string>; closest: string }
+type NewClient = { id: string; name: string; spellings: Set<string>; sources: Set<string>; closest: string; confirmed: boolean }
 
 type Plan = {
   newClients: NewClient[]
+  linkProblems: string[]
   proposals: Proposal[]
   finished: Array<{ name: string; detail: string }>
+  overused: Array<{ name: string; detail: string }>
   dormant: Array<{ name: string; detail: string }>
   unmatchedPayers: Array<{ name: string; detail: string; active: boolean }>
   ambiguous: Array<{ name: string; detail: string }>
@@ -166,8 +196,10 @@ function buildPlan(
   }
   const plan: Plan = {
     newClients: [],
+    linkProblems: [],
     proposals: [],
     finished: [],
+    overused: [],
     dormant: [],
     unmatchedPayers: [],
     ambiguous: [],
@@ -184,11 +216,16 @@ function buildPlan(
   // closest existing name so it can be linked by hand before --apply.
   const pending = new Map<string, NewClient>()
   let matchPending = createNameMatcher([])
+  // Her "same person" groups: every spelling resolves to the group's first name.
+  const canonical = new Map<string, string>()
+  for (const group of decisions.same) for (const n of group) canonical.set(normalizeName(n), group[0])
+  const toCanonical = (raw: string) => canonical.get(normalizeName(raw)) ?? raw
+  const confirmed = new Set(decisions.new.map(normalizeName))
   const recentNames = [...bookings.map((b) => b.name), ...reportRows.map((r) => r.name)].map(normalizeName)
   const addPending = (raw: string, source: string) => {
     const name = raw.replace(/\s+/g, ' ').trim()
     if (!normalizeName(name) || matchExisting(name).kind !== 'none') return
-    const p = matchPending(name)
+    const p = matchPending(toCanonical(name))
     if (p.kind !== 'none') {
       const c = pending.get(p.id)!
       c.spellings.add(name)
@@ -196,7 +233,15 @@ function buildPlan(
       return
     }
     const id = `new:${pending.size + 1}`
-    pending.set(id, { id, name: displayName(name), spellings: new Set([name]), sources: new Set([source]), closest: closest(name) })
+    const display = displayName(toCanonical(name))
+    pending.set(id, {
+      id,
+      name: display,
+      spellings: new Set([name]),
+      sources: new Set([source]),
+      closest: closest(name),
+      confirmed: false,
+    })
     matchPending = createNameMatcher([...pending.values()].map((c) => ({ id: c.id, name: c.name })))
   }
   for (const t of statementRows) if (t.remaining > 0) addPending(t.name, 'her statement')
@@ -207,12 +252,15 @@ function buildPlan(
     const recent = r.date >= firstDataDate || recentNames.some((n) => n === key || tokenSortRatio(n, key) >= FUZZY_THRESHOLD)
     if (recent) addPending(r.nameRaw, 'cash statement (package)')
   }
+  for (const c of pending.values()) {
+    c.confirmed = confirmed.has(normalizeName(c.name)) || [...c.spellings].some((x) => confirmed.has(normalizeName(x)))
+  }
   plan.newClients = [...pending.values()]
 
   // From here on, names resolve to existing clients first, then new ones.
   const match = (raw: string): NameMatch => {
     const m = matchExisting(raw)
-    return m.kind === 'none' ? matchPending(raw) : m
+    return m.kind === 'none' ? matchPending(toCanonical(raw)) : m
   }
   const nameOf = (id: string) => (id.startsWith('new:') ? `${pending.get(id)!.name} (new client)` : nameOfExisting(id))
   const idFor = (raw: string) => {
@@ -228,6 +276,7 @@ function buildPlan(
     const id = idFor(r.name)
     if (id && r.info === 'package' && r.date <= until) push(id, { date: r.date, source: 'report' })
   }
+  const cashLastDate = cash.map((r) => r.date).sort().at(-1) ?? '?'
   const confirmedAfterReports = bookings.filter((b) => b.status === 'confirmed' && b.date > lastReportDate && b.date <= until)
   const bookingsById = new Map<string, Booking[]>()
   for (const b of bookings) {
@@ -365,6 +414,13 @@ function buildPlan(
     }
 
     const detail = `package of ${t.size}, ${t.remaining} left on ${t.asOf} (her statement)${since.length ? `, ${since.length} since` : ''}`
+    if (used > t.size) {
+      plan.overused.push({
+        name: nameOf(clientId),
+        detail: `${detail}: **${used - t.size} more than were left**. Probably a new package bought after ${cashLastDate} (the end of the cash statement), or sessions owed. Sessions since: ${since.map((e) => e.date.slice(5)).join(', ')}`,
+      })
+      continue
+    }
     if (used >= t.size) {
       finish(clientId, detail)
       continue
@@ -398,6 +454,10 @@ function buildPlan(
     if (t) notes.push(`her statement (${t.asOf}) covered an earlier package`)
 
     const detail = `package of ${N} bought ${latest.date} (${latest.voucher ?? 'no voucher'}), ${files.used} used`
+    if (files.used > N) {
+      plan.overused.push({ name: nameOf(clientId), detail: `${detail}: **${files.used - N} more than the package has**. Probably a newer package not in the cash statement (it ends ${cashLastDate}), or sessions owed. ${files.notes.join('; ')}` })
+      continue
+    }
     if (files.used >= N) {
       finish(clientId, detail)
       continue
@@ -471,15 +531,27 @@ function writeReport(plan: Plan) {
     statementFiles.length ? 'Where her Statement of Account lists a package, her count of sessions remaining is used.' : '',
     `Daily reports run to ${lastReportDate}; after that, sessions come from the schedule's C marks.`,
     '',
-    `## New clients to add (${plan.newClients.length})`,
+    ...(plan.linkProblems.length
+      ? [`## Decisions that could not be applied (${plan.linkProblems.length})`, '', ...plan.linkProblems.map((x) => `- ${x}`), '']
+      : []),
+    `## New names waiting for your decision (${plan.newClients.filter((c) => !c.confirmed).length})`,
     '',
-    'Not found among the clients (Contacts is incomplete). The seed adds each one with **no phone**; fill phones in later.',
-    'If one of them **is** an existing client (see "closest"), open that client in the app and add this spelling under',
-    'Name variants before running `--apply`. Then the seed links to that client instead of adding a new one.',
+    'Not found among the clients and not in samples/seed-decisions.json yet. Nothing is created for them (and their',
+    'packages are held back) until you add each one to "new", "link" or "same" in that file.',
     '',
-    ...plan.newClients.map(
-      (c) => `- **${c.name}**: from ${[...c.sources].join(', ')}${c.spellings.size > 1 ? `; spellings: ${[...c.spellings].map((x) => `"${x}"`).join(', ')}` : ''}${c.closest}`,
-    ),
+    ...plan.newClients.filter((c) => !c.confirmed).map(newClientLine),
+    '',
+    `## New clients you confirmed (${plan.newClients.filter((c) => c.confirmed).length})`,
+    '',
+    'Created on --apply with **no phone**; fill phones in later. Other spellings are saved as name variants.',
+    '',
+    ...plan.newClients.filter((c) => c.confirmed).map(newClientLine),
+    '',
+    `## Your other decisions`,
+    '',
+    ...Object.entries(decisions.link).map(([a, b]) => `- "${a}" is the existing client **${b}**`),
+    ...Object.entries(decisions.rename).map(([a, b]) => `- Rename **${a}** to **${b}** (the old spelling stays as a name variant)`),
+    ...decisions.same.map((g) => `- One client **${g[0]}** for: ${g.map((x) => `"${x}"`).join(', ')}`),
     '',
     `## Packages to propose (${plan.proposals.length})`,
     '',
@@ -487,7 +559,7 @@ function writeReport(plan: Plan) {
     '',
     ...plan.proposals.map(
       (p) =>
-        `- **${p.clientName}**${normalizeName(p.cashName) !== normalizeName(p.clientName) ? ` ("${p.cashName}")` : ''}: ${p.sessionsTotal} sessions, $${p.priceTotal}, ${p.purchasedOn ? `bought ${p.purchasedOn} ${p.voucher ?? ''}` : 'purchase date unknown'}; **${p.used} used**${p.usedKnown ? '' : ' (at least)'}, ${p.sessionsTotal - p.used} left${p.fromStatement ? ' (her count)' : ''}. ${p.notes.join('; ')}.`,
+        `- ${p.clientId.startsWith('new:') && !plan.newClients.find((c) => c.id === p.clientId)?.confirmed ? '⏸ held back until you decide on this name: ' : ''}**${p.clientName}**${normalizeName(p.cashName) !== normalizeName(p.clientName) ? ` ("${p.cashName}")` : ''}: ${p.sessionsTotal} sessions, $${p.priceTotal}, ${p.purchasedOn ? `bought ${p.purchasedOn} ${p.voucher ?? ''}` : 'purchase date unknown'}; **${p.used} used**${p.usedKnown ? '' : ' (at least)'}, ${p.sessionsTotal - p.used} left${p.fromStatement ? ' (her count)' : ''}. ${p.notes.join('; ')}.`,
     ),
     '',
     section('Insurance clients to enter by hand', plan.insurance, 'Serial numbers are in no file, so approvals are not seeded.'),
@@ -504,10 +576,15 @@ function writeReport(plan: Plan) {
     ),
     section('Package payers not found among clients, not seen recently', plan.unmatchedPayers.filter((p) => !p.active), 'Probably finished; nothing to do unless one is still open.'),
     section('Ambiguous names (two clients match)', plan.ambiguous),
+    section('Used more sessions than were left — check (not proposed)', plan.overused, 'She decides: add the newer package by hand, or note sessions owed.'),
     section('Latest package looks finished (not proposed)', plan.finished),
     section('Bought before the files start and not seen since (not proposed)', plan.dormant),
   ]
   writeFileSync(join(SAMPLES, 'seed-report.md'), lines.join('\n'))
+}
+
+function newClientLine(c: NewClient): string {
+  return `- **${c.name}**: from ${[...c.sources].join(', ')}${c.spellings.size > 1 ? `; spellings: ${[...c.spellings].map((x) => `"${x}"`).join(', ')}` : ''}${c.closest}`
 }
 
 function section(title: string, items: Array<{ name: string; detail: string }>, intro?: string): string {
@@ -521,15 +598,19 @@ function section(title: string, items: Array<{ name: string; detail: string }>, 
 async function main() {
   const rl = createInterface({ input: process.stdin, output: process.stdout })
   const password = process.env.SAMPLE_CASH_PASSWORD || (await promptHidden('Cash statement password: '))
-  const cash = parseCashStatement(read(await decryptOfficeFile(new Uint8Array(readFileSync(cashFile!)), password), { type: 'array', cellDates: true }), {
+  const parsedCash = parseCashStatement(read(await decryptOfficeFile(new Uint8Array(readFileSync(cashFile!)), password), { type: 'array', cellDates: true }), {
     insurers: ['nextcare'],
-  }).rows
+  })
+  const cash = parsedCash.rows
+  for (const f of parsedCash.fixedDates) console.log(`Cash statement date corrected: ${f}`)
 
   if (!apply) {
     // Dry run: match against the Contacts tab, which is what she imports.
     const names = new Map(contacts.map((c) => [c.key, c.name]))
     const candidates = contacts.map((c) => ({ id: c.key, name: c.name }))
-    const plan = buildPlan(createNameMatcher(candidates), (id) => names.get(id) ?? id, cash, candidates)
+    const links = withLinks(candidates)
+    const plan = buildPlan(createNameMatcher(candidates, links.aliases), (id) => names.get(id) ?? id, cash, candidates)
+    plan.linkProblems = links.missing
     writeReport(plan)
     summary(plan)
     console.log('\nDry run only. Full report (with names): samples/seed-report.md')
@@ -562,13 +643,35 @@ async function main() {
   const { data: aliasRows, error: aliasError } = await db.from('client_aliases').select('alias, client_id')
   if (aliasError) throw aliasError
   const names = new Map(clients.map((c) => [c.id, c.name]))
-  const matcher = createNameMatcher(clients, new Map(aliasRows.map((a) => [a.alias, a.client_id])))
+  const links = withLinks(clients, new Map(aliasRows.map((a) => [a.alias, a.client_id])))
+  const matcher = createNameMatcher(clients, links.aliases)
   const plan = buildPlan(matcher, (id) => names.get(id) ?? id, cash, clients)
+  plan.linkProblems = links.missing
   writeReport(plan)
+
+  // Her links become name variants in the app, so it knows them from now on.
+  const linkAliases = Object.keys(decisions.link)
+    .map((spelling) => ({ alias: normalizeName(spelling), client_id: links.aliases.get(normalizeName(spelling)) }))
+    .filter((a): a is { alias: string; client_id: string } => Boolean(a.client_id))
+  if (linkAliases.length) {
+    const { error } = await db.from('client_aliases').upsert(linkAliases, { onConflict: 'owner_id,alias', ignoreDuplicates: true })
+    if (error) throw error
+  }
+
+  // Renames she asked for; the old spelling stays as a name variant.
+  let renamed = 0
+  for (const [from, to] of Object.entries(decisions.rename)) {
+    const id = clients.find((c) => normalizeName(c.name) === normalizeName(from))?.id
+    if (!id) continue // already renamed on an earlier run
+    const { error } = await db.from('clients').update({ name: to }).eq('id', id)
+    if (error) throw error
+    await db.from('client_aliases').upsert({ client_id: id, alias: normalizeName(from) }, { onConflict: 'owner_id,alias', ignoreDuplicates: true })
+    renamed++
+  }
 
   // Create the new clients (no phone), and keep their other spellings as name variants.
   const newIds = new Map<string, string>()
-  for (const c of plan.newClients) {
+  for (const c of plan.newClients.filter((x) => x.confirmed)) {
     const { data, error } = await db
       .from('clients')
       .insert({ name: c.name, notes: 'Added by the go-live seed: not in the Contacts tab. Phone unknown.' })
@@ -584,6 +687,8 @@ async function main() {
       if (aliasErr) throw aliasErr
     }
   }
+  // Packages of names she hasn't decided on yet are held back.
+  plan.proposals = plan.proposals.filter((p) => !p.clientId.startsWith('new:') || newIds.has(p.clientId))
   for (const p of plan.proposals) if (p.clientId.startsWith('new:')) p.clientId = newIds.get(p.clientId)!
 
   const { data: existing, error: existingError } = await db.from('packages').select('client_id, purchased_on, sessions_total')
@@ -608,7 +713,7 @@ async function main() {
     if (error) throw error
   }
   summary(plan)
-  console.log(`\nAdded ${newIds.size} new client(s) without a phone.`)
+  console.log(`\nAdded ${newIds.size} new client(s) without a phone; renamed ${renamed}; saved ${linkAliases.length} linked spelling(s).`)
   console.log(`Inserted ${rows.length} proposed package(s); ${plan.proposals.length - rows.length} were already there.`)
   console.log('Full report: samples/seed-report.md')
   await db.auth.signOut()
@@ -616,13 +721,16 @@ async function main() {
 
 function summary(plan: Plan) {
   console.log(`Sessions counted up to ${until} (daily reports to ${lastReportDate}, schedule after).`)
-  console.log(`New clients to add (no phone):  ${plan.newClients.length}`)
+  console.log(`New clients you confirmed:      ${plan.newClients.filter((c) => c.confirmed).length}`)
+  console.log(`New names waiting for decision: ${plan.newClients.filter((c) => !c.confirmed).length}`)
+  if (plan.linkProblems.length) console.log(`Decisions that couldn't apply:  ${plan.linkProblems.length}`)
   console.log(`Packages to propose:            ${plan.proposals.length} (${plan.proposals.filter((p) => p.fromStatement).length} from her statement, ${plan.proposals.filter((p) => !p.usedKnown).length} with an uncertain count)`)
   console.log(`Statement rows not matched:     ${plan.unmatchedStatement.length}`)
   console.log(`Insurance clients to enter:     ${plan.insurance.length}`)
   console.log(`On package, no purchase found:  ${plan.packageWithoutPurchase.length}`)
   console.log(`Package payers not matched:     ${plan.unmatchedPayers.length} people (${plan.unmatchedPayers.filter((p) => p.active).length} still coming in)`)
   console.log(`Ambiguous names:                ${plan.ambiguous.length}`)
+  console.log(`Used more than was left:        ${plan.overused.length}`)
   console.log(`Latest package finished:        ${plan.finished.length}`)
   console.log(`Old and not seen since:         ${plan.dormant.length}`)
 }
