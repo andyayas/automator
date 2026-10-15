@@ -1,0 +1,17 @@
+# Real clinic data - never commit
+samples/
+*.xlsx
+*.xls
+*.csv
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Build / deps
+node_modules/
+dist/
+.DS_Store
+.vite/
+coverage/
