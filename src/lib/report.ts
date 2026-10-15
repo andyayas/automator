@@ -249,4 +249,8 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`G${incomeTop + 3}`, f(`G${incomeTop + 1}-G${incomeTop + 2}`, totalCollected - totalExpenses), money)
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
+  // The template hides gridlines (showGridLines="false"), but ExcelJS reads that
+  // value as true, so set it explicitly: the sheet stays white like the template.
+  const view = ws.views?.[0] ?? {}
+  ws.views = [{ ...view, state: 'normal', showGridLines: false }]
 }

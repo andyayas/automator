@@ -68,8 +68,9 @@ async function filled(d: ReportData) {
 }
 
 describe('buildReport', () => {
-  it('keeps the header, writes the date in C3', async () => {
+  it('keeps the header, writes the date in C3, and hides gridlines like the template', async () => {
     const { ws } = await filled(data)
+    expect(ws.views[0].showGridLines).toBe(false)
     expect(ws.getCell('C1').value).toBe('DAILY REPORT')
     expect(ws.getCell('C2').value).toBe('Test Clinic')
     expect(ws.getCell('C3').value).toBe('Date: 16 October 2026')
