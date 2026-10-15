@@ -521,14 +521,18 @@ locally before calling a phase done.
 
 ## Open questions for the admin
 
-- Where do **Free** sessions go in the new template?
-- What exactly is **Serial Number**: the approval number or a per-session claim
-  number?
-- What formula should **Package Not Paid** (F54) use?
-- Is dropping the **Therapist** column intended?
-- What happens when a section overflows its rows?
-- Does the date go in `D3`?
-- Should a same-day cancellation count against a package or approval?
-- Which insurers are in use, and what does each pay per session?
-- Which Google account opens the clinic sheet on the clinic phone: hers or a
-  clinic account? Live reading needs an account with at least view access.
+Answered 2026-10-15:
+- **Free** sessions: a small **Free** table in the report, only on days that have any.
+- **Package Not Paid** (F54): the number of package sessions (that day) whose
+  package is not fully paid yet.
+- **Therapist** column: wanted; add it to each table.
+- **Section overflow**: sections are dynamic, as many rows as the day needs
+  (no fixed 12/8/10 rows); totals and the summary move with them.
+- **Date** goes in **C3**, replacing the "Date:" label: "Date: 15 October 2026".
+- **Same-day cancellation (X)** counts for nothing: no session deducted, no charge.
+- **Insurance billed per session**: default **$25**, editable per approval.
+
+Still open:
+- What exactly is **Serial Number**: the approval number or a per-session claim number?
+- Which **insurers** are in use, and what does each pay per session?
+- Which Google account opens the clinic sheet on the clinic phone: hers or a clinic account?
