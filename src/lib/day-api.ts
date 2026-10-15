@@ -3,6 +3,7 @@
 
 import type { Tables } from './database.types'
 import type { DayRow, ExpenseLine } from './day-builder'
+import builtInTemplateUrl from '../assets/daily-report-template.xlsx?url'
 import { supabase } from './supabase'
 
 export type DaySessionRow = Tables<'day_sessions'>
@@ -134,11 +135,21 @@ export async function templateInfo(): Promise<{ updatedAt: string | null } | nul
   return file ? { updatedAt: file.updated_at ?? file.created_at ?? null } : null
 }
 
+/** Her uploaded template if she has one, otherwise the template built into the app. */
 export async function downloadTemplate(): Promise<ArrayBuffer> {
   const folder = await userFolder()
-  const { data, error } = await supabase.storage.from(BUCKET).download(`${folder}/${TEMPLATE_FILE}`)
-  if (error || !data) throw new Error('No report template yet. Upload it in Settings first.')
-  return data.arrayBuffer()
+  const { data } = await supabase.storage.from(BUCKET).download(`${folder}/${TEMPLATE_FILE}`)
+  if (data) return data.arrayBuffer()
+  const res = await fetch(builtInTemplateUrl)
+  if (!res.ok) throw new Error('The report template could not be loaded. Check the connection and try again.')
+  return res.arrayBuffer()
+}
+
+/** Goes back to the built-in template. */
+export async function removeTemplate() {
+  const folder = await userFolder()
+  const { error } = await supabase.storage.from(BUCKET).remove([`${folder}/${TEMPLATE_FILE}`])
+  fail(error)
 }
 
 export async function saveReport(date: string, bytes: Uint8Array) {

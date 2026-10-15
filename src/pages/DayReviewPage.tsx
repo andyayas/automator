@@ -20,7 +20,6 @@ import {
   usePackages,
   useScheduleDay,
   useSettings,
-  useTemplateInfo,
 } from '../lib/queries'
 import { searchClients } from '../lib/search'
 
@@ -58,7 +57,6 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const labels = useExpenseLabels()
   const settings = useSettings()
   const review = useDayReview(date)
-  const template = useTemplateInfo()
   const latestCash = useLatestCashDate()
   const invalidate = useInvalidate()
 
@@ -124,7 +122,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setError(null)
     try {
       await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)))
-      if (template.data) {
+      {
         setBusy('Filling the report…')
         const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
         const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -316,13 +314,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
           </Section>
 
           <div className="confirm-bar">
-            {!template.data && template.isFetched && (
-              <p className="muted small">
-                No report template yet: the day is saved without the Excel file. <Link to="/more/settings">Upload it in Settings</Link>.
-              </p>
-            )}
             <button type="button" className="button primary block" disabled={Boolean(busy) || !rows.length} onClick={onConfirm}>
-              {busy ?? (template.data ? 'Confirm and generate report' : 'Confirm day')}
+              {busy ?? 'Confirm and generate report'}
             </button>
             <p className="muted small center">Confirming takes these sessions off packages and approvals.</p>
           </div>

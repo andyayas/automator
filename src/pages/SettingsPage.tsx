@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
-import { uploadTemplate } from '../lib/day-api'
+import { removeTemplate, uploadTemplate } from '../lib/day-api'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { formatDate, parseNumber } from '../lib/format'
 import { normalizeName } from '../lib/names'
@@ -262,15 +262,14 @@ function TemplateSettings() {
     <Section title="Daily report template">
       <div className="card">
         <p className="small">
-          The blank daily report (.xlsx) with the logo. It is stored privately in your account and filled in when you
-          confirm a day.
-        </p>
-        <p className="muted small">
-          {info.data ? `Uploaded ${formatDate(info.data.updatedAt?.slice(0, 10))}.` : info.isPending ? '' : 'Not uploaded yet.'}
+          {info.data
+            ? `Using the template you uploaded on ${formatDate(info.data.updatedAt?.slice(0, 10))}.`
+            : 'Using the clinic’s template built into the app.'}{' '}
+          To change the layout or logo, upload a new .xlsx here.
         </p>
         {state && <p className={state.startsWith('Saved') ? 'muted small' : 'error'}>{state}</p>}
         <label className="button block file-button">
-          {info.data ? 'Replace the template' : 'Upload the template'}
+          {info.data ? 'Replace the template' : 'Upload a different template'}
           <input
             type="file"
             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -289,6 +288,19 @@ function TemplateSettings() {
             }}
           />
         </label>
+        {info.data && (
+          <button
+            type="button"
+            className="button ghost block"
+            onClick={async () => {
+              await removeTemplate()
+              await invalidate.template()
+              setState('Saved. Using the built-in template again.')
+            }}
+          >
+            Use the built-in template again
+          </button>
+        )}
       </div>
     </Section>
   )

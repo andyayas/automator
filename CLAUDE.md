@@ -136,8 +136,11 @@ anything.
   is gitignored. Test fixtures that must be committed are synthetic, with invented
   names. Don't paste real client names into code, comments, tests, commit messages
   or this file.
-- **No clinic-identifying assets in the repo.** The report template and logo live
-  in a **private Supabase Storage bucket** and are downloaded at runtime.
+- **Report template:** the blank template (labels, clinic name, logo) is built
+  into the app at `src/assets/daily-report-template.xlsx`, by the owner's
+  decision on 2026-10-15, so it is public. It's the only spreadsheet the
+  leak guard allows. An uploaded template (Settings) in the private bucket
+  takes priority. Nothing else clinic-identifying goes in the repo.
 - **The Supabase anon / publishable key is public by design.** Row-level security is what
   protects data. Every table gets RLS enabled, with an `owner_id uuid default
   auth.uid()` column and policies `using (owner_id = auth.uid())` /
@@ -516,9 +519,8 @@ locally before calling a phase done.
    packages/approvals. Flags: unmatched name, paid-but-not-scheduled,
    no-status, package/approval exhausted, session-number mismatch. She edits
    and confirms, then the report is generated from the template, downloaded,
-   and saved to Storage. Settings gets an upload for the template file, which
-   goes to the private bucket; it holds the logo, so nothing clinic-specific
-   ships with the app.
+   and saved to Storage. The template is built into the app; Settings can
+   upload a replacement to the private bucket.
    *Done when* rebuilding the September days reproduces the old reports'
    clients and amounts, or every difference is explained.
 

@@ -9,9 +9,12 @@ else
   files=$(git ls-files)
 fi
 
+# The blank report template is the one spreadsheet allowed in the repo (owner's
+# decision, 2026-10-15): it holds only labels, the clinic name and the logo.
 bad=$(printf '%s\n' "$files" \
   | grep -Ei '^samples/|\.(xlsx|xlsm|xls|csv)$|(^|/)\.env' \
-  | grep -Ev '(^|/)\.env\.example$')
+  | grep -Ev '(^|/)\.env\.example$' \
+  | grep -Ev '^src/assets/daily-report-template\.xlsx$')
 
 if [ -n "$bad" ]; then
   echo "Refusing: these files must never be committed (real data or secrets):" >&2
