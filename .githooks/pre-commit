@@ -1,0 +1,24 @@
+#!/bin/sh
+# Blocks commits that include clinic data, env files or secret values.
+# Enabled by `npm install` (the prepare script sets core.hooksPath).
+
+sh scripts/check-tracked.sh --staged || exit 1
+
+added=$(git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++')
+
+# Secret values from .env.local must never appear in a commit. Values are not printed.
+if [ -f .env.local ]; then
+  for name in SAMPLE_CASH_PASSWORD RLS_TEST_A_PASSWORD RLS_TEST_B_PASSWORD; do
+    value=$(grep "^$name=" .env.local | cut -d= -f2-)
+    [ -n "$value" ] || continue
+    if printf '%s\n' "$added" | grep -qF -- "$value"; then
+      echo "Refusing: staged changes contain the value of $name from .env.local." >&2
+      exit 1
+    fi
+  done
+fi
+
+if printf '%s\n' "$added" | grep -qE 'sb_secret_[A-Za-z0-9]|SERVICE_ROLE_KEY *= *[A-Za-z0-9]'; then
+  echo "Refusing: staged changes look like they contain a Supabase service_role/secret key." >&2
+  exit 1
+fi

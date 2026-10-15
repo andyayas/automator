@@ -43,6 +43,17 @@ anything.
   the frontend, a commit, or a log. Never echo the cash statement password.
 - Keep the checklist below up to date as items get done.
 
+### Commands
+
+- `npm run dev` / `npm test` / `npm run lint` / `npm run build`
+- `supabase db push --linked` applies migrations (no DB password needed).
+- `npm run check:rls` must pass after every schema change. It fails if a
+  table has no fixture in `scripts/rls-check.ts`, so add one for each new
+  table. New migrations that add tables end with the assertion block from
+  `20261015120200_security_check.sql`.
+- The pre-commit hook (`.githooks/`, enabled by `npm install`) and CI both
+  refuse `samples/`, spreadsheets and `.env*` files.
+
 ### Manual setup checklist
 
 - [x] Supabase: turn off "Allow new users to sign up" (Authentication → Sign In
