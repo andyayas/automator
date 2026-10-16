@@ -38,10 +38,6 @@ export function MorePage() {
             ›
           </span>
         </Link>
-        <div className="list-row">
-          <span>Export all data</span>
-          <span className="muted">Coming soon</span>
-        </div>
       </div>
 
       <div className="card">
