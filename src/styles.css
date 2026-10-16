@@ -10,8 +10,8 @@
   --accent: #1d4ed8;
   --accent-contrast: #ffffff;
   --accent-soft: #e8eefd;
-  /* WhatsApp's green, deepened to sit with the blue (#25d366 is the brand original). */
-  --whatsapp: #15803d;
+  /* WhatsApp's green, one shade deeper than the logo's #25d366 so white text reads well. */
+  --whatsapp: #1da851;
   --whatsapp-text: #ffffff;
   --danger: #b42318;
   --danger-soft: #fdecea;
@@ -39,8 +39,6 @@
     --accent: #7aa7ff;
     --accent-contrast: #071330;
     --accent-soft: #15223f;
-    --whatsapp: #5cc98a;
-    --whatsapp-text: #052e16;
     --danger: #ff8a80;
     --danger-soft: #3a1714;
     --warn: #f5b84a;
