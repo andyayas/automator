@@ -52,7 +52,16 @@ export function RemindersPage() {
 
   return (
     <section className="page">
-      <PageHeader title="Reminders" />
+      <PageHeader
+        title="Reminders"
+        action={
+          queue.length > 0 && (
+            <Badge tone={sentCount === queue.length ? 'accent' : 'neutral'}>
+              {sentCount === queue.length ? `All ${queue.length} sent ✓` : `${sentCount}/${queue.length} sent`}
+            </Badge>
+          )
+        }
+      />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 
@@ -78,9 +87,6 @@ export function RemindersPage() {
 
       {queue.length > 0 && (
         <>
-          <p className={`small center sent-count${sentCount === queue.length ? ' all-sent' : ''}`}>
-            {sentCount === queue.length ? `All ${queue.length} sent ✓` : `${sentCount} of ${queue.length} sent`}
-          </p>
           <div className="stack">
             {queue.map((e) => (
               <ReminderRow

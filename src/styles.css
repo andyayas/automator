@@ -275,15 +275,6 @@ li + li {
 }
 
 /* Opens WhatsApp: its own green, so it's recognisable at a glance. */
-.sent-count {
-  margin: 0;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.sent-count.all-sent {
-  color: var(--accent);
-}
 
 .button.whatsapp {
   background: var(--whatsapp);
