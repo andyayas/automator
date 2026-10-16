@@ -97,8 +97,9 @@ anything.
       the clinic sheet.
 - [x] Google client secret stored as Supabase function secrets
       (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`).
-- [ ] Google Auth Platform → Branding filled in, then Audience → **Publish
-      app** (In production). In Testing mode Google expires refresh tokens
+- [x] Google Auth Platform → Branding (home page, `privacy.html`, authorized
+      domain `andyayas.github.io`), then Audience → **Publish app**: In
+      production since 2026-10-16. In Testing mode Google expires refresh tokens
       after 7 days. Unverified is fine for one user: she taps Advanced → Go to
       Clinic Admin once.
 - [ ] She connects Google once with the clinic account (Settings → Google
