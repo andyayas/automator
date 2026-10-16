@@ -65,7 +65,7 @@ describe('SheetRefresh', () => {
     await userEvent.setup().click(button)
     expect(m.connectGoogle).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(m.runScheduleImport).toHaveBeenCalledTimes(1))
-    expect(await screen.findByText(/Live from the Google Sheet · read at/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/Live from the sheet · \d{1,2}:\d{2} (AM|PM)/))
   })
 
   it('reads the sheet by itself once connected, then not again for a few minutes', async () => {

@@ -156,11 +156,16 @@ export function SheetRefresh({ date, showTime = true }: { date: string; showTime
       <div className="sheet-live-row">
         <span className={`live-dot${busy ? ' busy' : ''}${failed ? ' failed' : ''}`} aria-hidden="true" />
         <p className="muted small grow" role="status">
-          {busy
-            ? state.label
-            : failed
-              ? `Couldn’t read the Google Sheet${time ? ` (last read at ${time})` : ''}`
-              : `Live from the Google Sheet${time ? ` · read at ${time}` : ''}${state.kind === 'done' && state.text ? ` · ${state.text}` : ''}`}
+          {busy ? (
+            state.label
+          ) : (
+            <>
+              {failed ? 'Couldn’t read the sheet' : 'Live from the sheet'}
+              {/* The time never breaks across lines. */}
+              {time && <span className="nowrap">{failed ? ` · last read ${time}` : ` · ${time}`}</span>}
+              {!failed && state.kind === 'done' && state.text ? ` · ${state.text}` : ''}
+            </>
+          )}
         </p>
         <button type="button" className="button small-button" disabled={busy} onClick={() => void refresh(false)}>
           {failed ? 'Try again' : 'Refresh now'}
