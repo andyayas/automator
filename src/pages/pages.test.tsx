@@ -109,15 +109,12 @@ describe('Today', () => {
     expect(api.setStatus).toHaveBeenCalledWith('package', 'prop1', 'active')
   })
 
-  it('shows notes on proposals but not on active packages', async () => {
-    api.fetchPackages.mockResolvedValue([
-      pkg({ id: 'prop1', status: 'proposed', notes: 'Proposal note' }),
-      pkg({ id: 'act1', client: omar, client_id: 'c2', notes: 'Active note' }),
-    ])
+  it('leaves active packages to the Clients page', async () => {
+    api.fetchPackages.mockResolvedValue([pkg({ id: 'act1', client: omar, client_id: 'c2' })])
     renderRoute('/', [{ path: '/', element: <TodayPage /> }])
-    expect(await screen.findByText('Proposal note')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /active packages/i })).toBeInTheDocument()
-    expect(screen.queryByText('Active note')).not.toBeInTheDocument()
+    expect(await screen.findByText(/No alerts/)).toBeInTheDocument()
+    expect(screen.queryByText('Omar Sample')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /active packages/i })).not.toBeInTheDocument()
   })
 })
 

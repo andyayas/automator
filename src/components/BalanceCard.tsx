@@ -6,13 +6,12 @@ import { RemainingBadge, StatusBadge } from './ui'
 
 type Props = {
   showClient?: boolean
-  hideNotes?: boolean
   children?: ReactNode
 } & ({ kind: 'package'; item: PackageWithBalance } | { kind: 'approval'; item: ApprovalWithBalance })
 
 /** One package or approval: who, what, sessions left. Tapping opens the edit form. */
 export function BalanceCard(props: Props) {
-  const { kind, item, showClient, hideNotes, children } = props
+  const { kind, item, showClient, children } = props
   const total = kind === 'package' ? props.item.sessions_total : props.item.sessions_approved
   const editPath = kind === 'package' ? `/packages/${item.id}` : `/approvals/${item.id}`
 
@@ -48,7 +47,7 @@ export function BalanceCard(props: Props) {
           </div>
         </div>
         <p className="muted small">{details.join(' · ')}</p>
-        {item.notes && !hideNotes && <p className="small note">{item.notes}</p>}
+        {item.notes && <p className="small note">{item.notes}</p>}
       </Link>
       {children && <div className="card-actions">{children}</div>}
     </article>

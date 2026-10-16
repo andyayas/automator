@@ -35,9 +35,6 @@ export function TodayPage() {
     ...apps.filter((a) => a.status === 'proposed').map((a) => ({ kind: 'approval' as const, item: a })),
   ]
   const alerts = balanceAlerts(pkgs, apps, today)
-  const byRemaining = <T extends { sessions_remaining: number }>(a: T, b: T) => a.sessions_remaining - b.sessions_remaining
-  const activePackages = pkgs.filter((p) => p.status === 'active').sort(byRemaining)
-  const activeApprovals = apps.filter((a) => a.status === 'active').sort(byRemaining)
   const noClients = clients.data?.length === 0
 
   async function act(id: string, action: () => Promise<void>) {
@@ -139,29 +136,9 @@ export function TodayPage() {
         </Section>
       )}
 
-      <Section title="Active packages" count={activePackages.length}>
-        {activePackages.length ? (
-          <div className="stack">
-            {activePackages.map((p) => (
-              <BalanceCard key={p.id} kind="package" item={p} showClient hideNotes />
-            ))}
-          </div>
-        ) : (
-          <Empty>No active packages.</Empty>
-        )}
-      </Section>
-
-      <Section title="Active insurance approvals" count={activeApprovals.length}>
-        {activeApprovals.length ? (
-          <div className="stack">
-            {activeApprovals.map((a) => (
-              <BalanceCard key={a.id} kind="approval" item={a} showClient hideNotes />
-            ))}
-          </div>
-        ) : (
-          <Empty>No active approvals.</Empty>
-        )}
-      </Section>
+      {proposed.length === 0 && alerts.length === 0 && (
+        <Empty>No alerts. Packages and approvals are on the Clients page.</Empty>
+      )}
     </TodayFrame>
   )
 }
