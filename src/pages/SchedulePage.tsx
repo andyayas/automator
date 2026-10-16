@@ -45,7 +45,7 @@ export function SchedulePage() {
         title="Schedule"
         action={
           sheetUrl && (
-            <a className="button" href={sheetUrl} target="_blank" rel="noreferrer">
+            <a className="button small-button" href={sheetUrl} target="_blank" rel="noreferrer">
               Edit in Google Sheets
             </a>
           )
