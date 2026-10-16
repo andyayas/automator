@@ -21,6 +21,7 @@ export function DaySources({ date }: { date: string }) {
   const invalidate = useInvalidate()
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [password, setPassword] = useState('')
+  const [dragging, setDragging] = useState(false)
 
   const behind = latest.isFetched && (latest.data ?? '') < date && date <= todayISO()
 
@@ -40,32 +41,41 @@ export function DaySources({ date }: { date: string }) {
   }
 
   return (
-    <div className={`card day-sources ${behind ? 'behind' : ''}`}>
-      <div className="source-row">
-        <div className="row-text">
-          <span className="strong">Cash statement</span>
-          <span className={`small ${behind ? 'warn-text' : 'muted'}`}>
-            {latest.data ? `In the app up to ${formatDate(latest.data, { short: true })}` : latest.isFetched ? 'Not uploaded yet' : ''}
-            {behind ? ': upload today’s file' : ''}
-          </span>
-        </div>
-        <label className={`button small-button file-button ${behind ? 'primary' : ''} ${state.kind === 'busy' ? 'busy' : ''}`}>
-          {state.kind === 'busy' ? 'Working…' : 'Upload'}
-          <input
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={state.kind === 'busy'}
-            aria-label="Upload the cash statement"
-            onChange={async (e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void upload({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, null)
-            }}
-          />
-        </label>
-      </div>
+    <div className="card day-sources">
+      <label
+        className={`drop-zone ${behind ? 'behind' : ''} ${dragging ? 'dragging' : ''} ${state.kind === 'busy' ? 'busy' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={async (e) => {
+          e.preventDefault()
+          setDragging(false)
+          const f = e.dataTransfer.files[0]
+          if (f && state.kind !== 'busy') void upload({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, null)
+        }}
+      >
+        <span className="drop-zone-title">
+          {state.kind === 'busy' ? state.label : 'Upload the cash statement. Tap to choose.'}
+        </span>
+        <span className={`small ${behind ? 'warn-text' : 'muted'}`}>
+          {latest.data ? `In the app up to ${formatDate(latest.data, { short: true })}` : latest.isFetched ? 'Not uploaded yet' : ''}
+          {behind ? ': upload today’s file' : ''}
+        </span>
+        <input
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          disabled={state.kind === 'busy'}
+          aria-label="Upload the cash statement"
+          onChange={async (e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) void upload({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, null)
+          }}
+        />
+      </label>
 
-      {state.kind === 'busy' && <p className="muted small">{state.label}</p>}
       {state.kind === 'done' && <p className="muted small">✓ {state.text}</p>}
       {state.kind === 'error' && (
         <p className="error small" role="alert">
