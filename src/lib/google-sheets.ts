@@ -44,11 +44,11 @@ async function api<T>(token: string, path: string): Promise<T> {
   if (res.status === 401) clearGoogleToken()
   throw new Error(
     res.status === 403
-      ? "This Google account can't open the sheet. Sign in with the account that has access to it."
+      ? "The connected Google account can't open this sheet. In Settings, disconnect Google and connect the account the sheet is shared with."
       : res.status === 404
         ? 'Sheet not found. Check the sheet link in Settings.'
         : res.status === 401
-          ? 'Google sign-in expired. Tap refresh again.'
+          ? 'Google access expired. Refresh again.'
           : `Google Sheets error (${res.status}).`,
   )
 }

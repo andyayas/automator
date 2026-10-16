@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'supabase/functions/**/*.test.ts'],
     // Integration tests hit the live project; only `npm run test:integration` runs them.
     exclude: process.env.INTEGRATION ? ['node_modules/**'] : ['node_modules/**', 'src/**/*.integration.test.ts'],
     // Test-only logins from .env.local; never VITE_-prefixed, so never in the bundle.

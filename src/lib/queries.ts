@@ -2,6 +2,7 @@ import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
 import * as sched from './schedule-api'
 import * as day from './day-api'
+import { fetchGoogleStatus } from './google'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -10,6 +11,7 @@ export const queryClient = new QueryClient({
 })
 
 export const keys = {
+  googleStatus: ['google-status'] as const,
   clients: ['clients'] as const,
   client: (id: string) => ['clients', id] as const,
   aliases: (clientId: string) => ['aliases', clientId] as const,
@@ -53,6 +55,7 @@ export const useScheduleDay = (date: string) =>
 export const useReminders = (date: string) =>
   useQuery({ queryKey: keys.reminders(date), queryFn: () => sched.fetchReminders(date) })
 export const useSettings = () => useQuery({ queryKey: keys.settings, queryFn: sched.fetchSettings })
+export const useGoogleStatus = () => useQuery({ queryKey: keys.googleStatus, queryFn: fetchGoogleStatus, staleTime: 5 * 60_000 })
 export const usePatterns = () => useQuery({ queryKey: keys.patterns, queryFn: sched.fetchPatterns })
 
 export const useDayCash = (date: string) => useQuery({ queryKey: keys.dayCash(date), queryFn: () => day.fetchCashForDay(date) })

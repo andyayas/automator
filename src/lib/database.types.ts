@@ -777,6 +777,34 @@ export type Database = {
       }
     }
     Functions: {
+      google_connection_delete: {
+        Args: { p_owner: string }
+        Returns: undefined
+      }
+      google_connection_get: {
+        Args: { p_owner: string }
+        Returns: {
+          google_email: string
+          refresh_token: string
+          scope: string
+        }[]
+      }
+      google_connection_save: {
+        Args: {
+          p_email: string
+          p_owner: string
+          p_refresh_token: string
+          p_scope: string
+        }
+        Returns: undefined
+      }
+      google_connection_status: {
+        Args: never
+        Returns: {
+          connected_at: string
+          google_email: string
+        }[]
+      }
       merge_clients: {
         Args: { keep_id: string; remove_alias: string; remove_id: string }
         Returns: undefined

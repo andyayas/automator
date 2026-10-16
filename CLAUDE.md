@@ -50,7 +50,8 @@ anything.
 - `npm run check:rls` must pass after every schema change. It fails if a
   table has no fixture in `scripts/rls-check.ts`, so add one for each new
   table. New migrations that add tables end with the assertion block from
-  `20261015120200_security_check.sql`.
+  the latest migration that has one (the views-aware version, e.g.
+  `20261016100000_google_connection.sql`).
 - The pre-commit hook (`.githooks/`, enabled by `npm install`) and CI both
   refuse `samples/`, spreadsheets and `.env*` files.
 - The pre-commit hook also runs `scripts/scan-real-names.ts` when `samples/`
@@ -94,6 +95,14 @@ anything.
       Client ID in `.env.local` and the `VITE_GOOGLE_CLIENT_ID` repo variable.
 - [x] Google Auth Platform → Audience → Test users: the account(s) that open
       the clinic sheet.
+- [x] Google client secret stored as Supabase function secrets
+      (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`).
+- [ ] Google Auth Platform → Branding filled in, then Audience → **Publish
+      app** (In production). In Testing mode Google expires refresh tokens
+      after 7 days. Unverified is fine for one user: she taps Advanced → Go to
+      Clinic Admin once.
+- [ ] She connects Google once with the clinic account (Settings → Google
+      connection).
 - [x] Settings in the app: sender name, and the October sheet link
       (add each new month's link when the new sheet starts).
 - [x] Go-live (2026-10-15): Contacts imported, `npm run seed -- --apply` run.
@@ -133,11 +142,18 @@ anything.
   values so the styling survives.
 - **Google Sheet live read (phase 3b)**: Google Identity Services token client
   with scope `spreadsheets.readonly`, calling the Sheets API from the browser.
-  The access token lasts about an hour and is kept in `localStorage` until
-  then. While it's valid, Schedule, Reminders and the daily review re-read the
-  sheet by themselves (on opening, on returning to the app, every 5 minutes).
-  After it expires, one tap ("Connect Google Sheet") asks Google again: the
-  token model can't renew without a popup, and popups need a tap.
+  She connects **once** (Settings → Google connection, or "Connect Google
+  Sheet"): Google's popup code flow (`initCodeClient`, offline access) gives a
+  one-time code; the `google-token` Edge Function swaps it for a refresh token
+  kept in `private.google_connections` (outside the API schemas, reachable only
+  by the function's service role through `google_connection_*` functions).
+  Any of her devices then gets one-hour access tokens from the function with
+  no popup; Schedule, Reminders and the daily review re-read the sheet by
+  themselves (on opening, on returning to the app, every 5 minutes). Function
+  secrets `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are set with
+  `supabase secrets set`, never in the repo. Deploy it with
+  `supabase functions deploy google-token --project-ref ljwscptbrwpibbbfgdpk --use-api`.
+  It connects with the clinic Google account (the one the sheet is shared with).
 
 ## Security (non-negotiable)
 

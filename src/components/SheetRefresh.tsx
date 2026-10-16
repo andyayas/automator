@@ -1,11 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { parseContactsRows } from '../lib/contacts'
 import { SETTING } from '../lib/defaults'
 import { plural } from '../lib/format'
-import { googleConfigured, hasGoogleToken } from '../lib/google'
+import { connectGoogle, GoogleNotConnectedError, googleConfigured, loadGoogleScript } from '../lib/google'
 import { readLiveSheet } from '../lib/google-sheets'
-import { useInvalidate, useSettings } from '../lib/queries'
+import { keys, useGoogleStatus, useInvalidate, useSettings } from '../lib/queries'
 import { parseScheduleGrids } from '../lib/schedule'
 import { loadParseOptions, runScheduleImport } from '../lib/schedule-run'
 
@@ -25,15 +26,17 @@ type State =
 
 /**
  * Reads this month's clinic sheet live (read-only) and imports it like an
- * upload. While Google access is valid (about an hour after she connects) it
- * does this by itself: on opening the page, on coming back to the app, and
- * every few minutes. Otherwise one tap asks Google again.
+ * upload. Once Google is connected (one tap, once, on any device) it does this
+ * by itself: on opening the page, on coming back to the app, and every few
+ * minutes.
  */
 export function SheetRefresh({ date }: { date: string }) {
   const settings = useSettings()
   const invalidate = useInvalidate()
   const [state, setState] = useState<State>({ kind: 'idle' })
-  const [connected, setConnected] = useState(hasGoogleToken)
+  const status = useGoogleStatus()
+  const queryClient = useQueryClient()
+  const connected = status.data?.connected ?? false
 
   const month = date.slice(0, 7)
   const sheetUrl = ((settings.data?.[SETTING.sheetLinks] ?? {}) as Record<string, string>)[month]
@@ -45,10 +48,9 @@ export function SheetRefresh({ date }: { date: string }) {
   })
 
   useEffect(() => {
-    if (!googleConfigured || !sheetUrl) return
+    if (!googleConfigured || !sheetUrl || !connected) return
     const tick = () => {
-      setConnected(hasGoogleToken())
-      if (document.visibilityState !== 'visible' || !hasGoogleToken() || running) return
+      if (document.visibilityState !== 'visible' || running) return
       if (Date.now() - (lastRead.get(sheetUrl) ?? 0) < AUTO_REFRESH_MS) return
       void refreshRef.current(true)
     }
@@ -61,9 +63,14 @@ export function SheetRefresh({ date }: { date: string }) {
       document.removeEventListener('visibilitychange', tick)
       window.removeEventListener('focus', tick)
     }
-  }, [sheetUrl])
+  }, [sheetUrl, connected])
 
-  if (!googleConfigured || !settings.data) return null
+  // Ready before the tap, so the Google window opens straight away (phones block late popups).
+  useEffect(() => {
+    if (googleConfigured && status.data && !connected) void loadGoogleScript().catch(() => undefined)
+  }, [status.data, connected])
+
+  if (!googleConfigured || !settings.data || !status.data) return null
   if (!sheetUrl) {
     return (
       <p className="muted small">
@@ -76,7 +83,7 @@ export function SheetRefresh({ date }: { date: string }) {
     if (running) return
     running = true
     lastRead.set(sheetUrl, Date.now())
-    setState({ kind: 'busy', label: auto ? 'Reading the Google Sheet…' : 'Opening the Google Sheet…', auto })
+    setState({ kind: 'busy', label: 'Reading the Google Sheet…', auto })
     try {
       const live = await readLiveSheet(sheetUrl)
       const days = parseScheduleGrids(live.grids, await loadParseOptions())
@@ -96,11 +103,23 @@ export function SheetRefresh({ date }: { date: string }) {
       lastOk.set(sheetUrl, Date.now())
       setState({ kind: 'done', text: changed ? `${plural(changed, 'confirmed day')} left as they were` : '' })
     } catch (err) {
+      if (err instanceof GoogleNotConnectedError) void queryClient.invalidateQueries({ queryKey: keys.googleStatus })
       setState({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
     } finally {
-      setConnected(hasGoogleToken())
       running = false
     }
+  }
+
+  async function connect() {
+    setState({ kind: 'busy', label: 'Connecting to Google…', auto: false })
+    try {
+      await connectGoogle()
+    } catch (err) {
+      setState({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: keys.googleStatus })
+    await refresh(false)
   }
 
   const busy = state.kind === 'busy'
@@ -108,10 +127,10 @@ export function SheetRefresh({ date }: { date: string }) {
   if (!connected && !busy) {
     return (
       <div className="sheet-refresh">
-        <button type="button" className="button primary block" onClick={() => void refresh(false)}>
+        <button type="button" className="button primary block" onClick={() => void connect()}>
           Connect Google Sheet
         </button>
-        <p className="muted small">After you connect, it keeps the schedule up to date by itself for about an hour.</p>
+        <p className="muted small">Once, with the Google account that opens the clinic sheet. After that the schedule stays up to date by itself on all your devices.</p>
         {state.kind === 'error' && (
           <p className="error small" role="alert">
             {state.text}

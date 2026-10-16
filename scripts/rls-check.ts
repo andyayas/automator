@@ -254,6 +254,20 @@ async function main() {
     check(!!anonDown.error, 'anonymous cannot download files')
     const pub = await anon.storage.from(BUCKET).list()
     check(!pub.error && pub.data?.length === 0, 'anonymous cannot list the bucket')
+
+    // Google refresh tokens: only the google-token Edge Function (service role) reaches them.
+    for (const [who, db] of [['a signed-in user', b.db], ['anonymous', anon]] as const) {
+      const get = await db.rpc('google_connection_get', { p_owner: b.userId })
+      check(Boolean(get.error), `${who} cannot read Google tokens`)
+      const save = await db.rpc('google_connection_save', { p_owner: b.userId, p_email: null, p_refresh_token: TAG, p_scope: TAG })
+      check(Boolean(save.error), `${who} cannot write Google tokens`)
+      const del = await db.rpc('google_connection_delete', { p_owner: b.userId })
+      check(Boolean(del.error), `${who} cannot delete Google tokens`)
+      const table = await db.schema('private').from('google_connections').select('*')
+      check(Boolean(table.error), `${who} cannot reach the private schema`)
+    }
+    const status = await anon.rpc('google_connection_status')
+    check(Boolean(status.error), 'anonymous cannot ask for Google connection status')
   } finally {
     await b.db.storage.from(BUCKET).remove([storagePath])
     for (const table of created.reverse()) {

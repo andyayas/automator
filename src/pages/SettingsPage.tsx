@@ -5,7 +5,8 @@ import { removeTemplate, uploadTemplate } from '../lib/day-api'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { formatDate, parseNumber } from '../lib/format'
 import { normalizeName } from '../lib/names'
-import { keys, useInvalidate, usePatterns, useSettings, useTemplateInfo } from '../lib/queries'
+import { connectGoogle, disconnectGoogle, googleConfigured, loadGoogleScript } from '../lib/google'
+import { keys, useGoogleStatus, useInvalidate, usePatterns, useSettings, useTemplateInfo } from '../lib/queries'
 import { DEFAULT_REMINDER_TEMPLATE, REMINDER_PLACEHOLDERS, renderReminder, tomorrowISO } from '../lib/reminders'
 import { addPattern, deletePattern, ensureDefaults, saveSetting } from '../lib/schedule-api'
 import { Field } from './clients/form-parts'
@@ -36,6 +37,7 @@ export function SettingsPage() {
       <ReviewsFromSetting settings={settings.data} />
       <ReminderSettings settings={settings.data} />
       <SheetLinks settings={settings.data} />
+      {googleConfigured && <GoogleConnection />}
       <StaffNames settings={settings.data} />
       <Section title="Not clients">
         <p className="muted small">
@@ -161,6 +163,79 @@ function SheetLinks({ settings }: { settings: Record<string, unknown> }) {
           Add link
         </button>
       </form>
+    </Section>
+  )
+}
+
+/** Which Google account reads the sheet; connecting once covers every device. */
+function GoogleConnection() {
+  const status = useGoogleStatus()
+  const queryClient = useQueryClient()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const notConnected = status.data?.connected === false
+
+  // Ready before the tap, so the Google window opens straight away (phones block late popups).
+  useEffect(() => {
+    if (notConnected) void loadGoogleScript().catch(() => undefined)
+  }, [notConnected])
+
+  async function run(action: () => Promise<unknown>) {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      await queryClient.invalidateQueries({ queryKey: keys.googleStatus })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Section title="Google connection">
+      {status.isPending ? (
+        <Loading />
+      ) : status.isError ? (
+        <ErrorCard error={status.error} />
+      ) : status.data.connected ? (
+        <div className="card list">
+          <div className="list-row">
+            <span className="row-text">
+              <span className="strong">Connected{status.data.email ? ` as ${status.data.email}` : ''}</span>
+              <span className="muted small">
+                The app reads the sheet by itself on all your devices
+                {status.data.since ? ` · since ${formatDate(status.data.since.slice(0, 10), { short: true })}` : ''}
+              </span>
+            </span>
+            <button
+              type="button"
+              className="button ghost danger"
+              disabled={busy}
+              onClick={() => {
+                if (window.confirm('Disconnect Google? The app stops reading the sheet until you connect again.')) void run(disconnectGoogle)
+              }}
+            >
+              Disconnect
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="card">
+          <p className="muted small">
+            Connect once, with the Google account that opens the clinic sheet. Read-only: the app never changes the sheet.
+          </p>
+          <button type="button" className="button primary block" disabled={busy} onClick={() => void run(connectGoogle)}>
+            {busy ? 'Connecting…' : 'Connect Google'}
+          </button>
+        </div>
+      )}
+      {error && (
+        <p className="error small" role="alert">
+          {error}
+        </p>
+      )}
     </Section>
   )
 }
