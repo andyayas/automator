@@ -10,10 +10,9 @@
   --accent: #1d4ed8;
   --accent-contrast: #ffffff;
   --accent-soft: #e8eefd;
-  /* The clinic's red, only as a small brand touch (the greeting); never for actions. */
-  --brand: #c41e3a;
-  --whatsapp: #25d366;
-  --whatsapp-text: #06331a;
+  /* WhatsApp's green, deepened to sit with the blue (#25d366 is the brand original). */
+  --whatsapp: #15803d;
+  --whatsapp-text: #ffffff;
   --danger: #b42318;
   --danger-soft: #fdecea;
   --warn: #9a5b00;
@@ -40,7 +39,8 @@
     --accent: #7aa7ff;
     --accent-contrast: #071330;
     --accent-soft: #15223f;
-    --brand: #ff6b7d;
+    --whatsapp: #5cc98a;
+    --whatsapp-text: #052e16;
     --danger: #ff8a80;
     --danger-soft: #3a1714;
     --warn: #f5b84a;
@@ -110,7 +110,7 @@ li + li {
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--brand);
+  color: var(--accent);
 }
 
 /* ---------- Shell ---------- */
@@ -275,6 +275,16 @@ li + li {
 }
 
 /* Opens WhatsApp: its own green, so it's recognisable at a glance. */
+.sent-count {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.sent-count.all-sent {
+  color: var(--accent);
+}
+
 .button.whatsapp {
   background: var(--whatsapp);
   border-color: var(--whatsapp);

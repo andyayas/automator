@@ -78,8 +78,8 @@ export function RemindersPage() {
 
       {queue.length > 0 && (
         <>
-          <p className="muted small">
-            {sentCount} of {queue.length} sent · Tapping Send opens WhatsApp with the message ready; you press Send there.
+          <p className={`small center sent-count${sentCount === queue.length ? ' all-sent' : ''}`}>
+            {sentCount === queue.length ? `All ${queue.length} sent ✓` : `${sentCount} of ${queue.length} sent`}
           </p>
           <div className="stack">
             {queue.map((e) => (
