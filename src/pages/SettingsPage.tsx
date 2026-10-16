@@ -38,8 +38,8 @@ export function SettingsPage() {
       <PageHeader title="Settings" back="/more" />
       {/* What she uses: the month's sheet link, Google, and the reminder message. */}
       <SheetLinks settings={settings.data} />
-      {googleConfigured && <GoogleConnection />}
       <ReminderSettings settings={settings.data} />
+      {googleConfigured && <GoogleConnection />}
 
       <button
         type="button"
