@@ -1,4 +1,4 @@
-// Inline stroke icons for the navigation (24×24, currentColor).
+// Inline stroke icons (24×24, currentColor).
 import type { ReactNode } from 'react'
 type IconProps = { className?: string }
 
@@ -53,5 +53,18 @@ export const MoreIcon = (p: IconProps) => (
     <circle cx="5" cy="12" r="1.2" />
     <circle cx="12" cy="12" r="1.2" />
     <circle cx="19" cy="12" r="1.2" />
+  </Icon>
+)
+
+export const CheckIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </Icon>
+)
+
+export const PendingIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
   </Icon>
 )

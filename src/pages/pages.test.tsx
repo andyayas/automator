@@ -98,6 +98,8 @@ describe('Today', () => {
     renderRoute('/', [{ path: '/', element: <TodayPage /> }])
 
     const review = (await screen.findByRole('heading', { name: /needs your review/i })).closest('section')!
+    expect(await screen.findByText('2 days to review · 1 to accept · 1 alert')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /reminders/i })).toHaveAttribute('href', expect.stringMatching(/\/reminders\?date=\d{4}-\d\d-\d\d$/))
     expect(within(review).getByText('Jane Testerson')).toBeInTheDocument()
     expect(within(review).getByText(/4 used before the app/)).toBeInTheDocument()
 

@@ -2,11 +2,13 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { BalanceCard } from '../components/BalanceCard'
 import { DailyReviewCard } from '../components/DailyReviewCard'
-import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
+import { ErrorCard, Loading, Section } from '../components/ui'
+import { CheckIcon } from '../layout/icons'
 import { deleteApproval, deletePackage, setStatus, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
 import { balanceAlerts } from '../lib/alerts'
-import { todayISO } from '../lib/format'
+import { plural, todayISO } from '../lib/format'
 import { useApprovals, useClients, useInvalidate, usePackages } from '../lib/queries'
+import { useReviewDays } from '../lib/review-days'
 
 export function TodayPage() {
   const packages = usePackages()
@@ -79,10 +81,10 @@ export function TodayPage() {
   )
 
   return (
-    <TodayFrame heading={heading}>
+    <TodayFrame heading={heading} summary={<TodaySummary proposals={proposed.length} alerts={alerts.length} />}>
       {actionError && <p className="error" role="alert">{actionError}</p>}
 
-      <Section title="Daily review">
+      <Section title="Daily tasks">
         <DailyReviewCard />
       </Section>
 
@@ -123,12 +125,15 @@ export function TodayPage() {
               const path = a.item.type === 'package' ? `/packages/${v.id}` : `/approvals/${v.id}`
               const what = a.item.type === 'package' ? 'Package' : a.item.value.insurer
               return (
-                <Link key={`${a.kind}-${v.id}`} to={path} className={`list-row link alert-${a.kind}`}>
-                  <span>
+                <Link key={`${a.kind}-${v.id}`} to={path} className={`list-row link alert-row ${a.kind}`}>
+                  <span className="row-text grow">
                     <span className="strong">{v.client?.name ?? 'Unknown client'}</span>
-                    <span className="muted small block">{what}</span>
+                    <span className="muted small">{what}</span>
                   </span>
-                  <span className={`alert-text ${a.kind}`}>{a.message}</span>
+                  <span className="badges">
+                    <span className={`alert-text ${a.kind}`}>{a.message}</span>
+                    <span className="chevron">›</span>
+                  </span>
                 </Link>
               )
             })}
@@ -137,16 +142,44 @@ export function TodayPage() {
       )}
 
       {proposed.length === 0 && alerts.length === 0 && (
-        <Empty>No alerts. Packages and approvals are on the Clients page.</Empty>
+        <div className="card all-clear">
+          <span className="task-icon done">
+            <CheckIcon />
+          </span>
+          <p className="muted small">
+            No alerts. Packages and approvals are on the <Link to="/clients">Clients</Link> page.
+          </p>
+        </div>
       )}
     </TodayFrame>
   )
 }
 
-function TodayFrame({ heading, children }: { heading: string; children: ReactNode }) {
+function greeting(hour = new Date().getHours()): string {
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+}
+
+/** "2 days to review · 1 to accept · 2 alerts", or all caught up. */
+function TodaySummary({ proposals, alerts }: { proposals: number; alerts: number }) {
+  const { days, earlier, loaded } = useReviewDays()
+  if (!loaded) return null
+  const toReview = days.filter((d) => !d.confirmed).length + earlier.length
+  const parts = [
+    toReview && plural(toReview, 'day') + ' to review',
+    proposals && `${proposals} to accept`,
+    alerts && plural(alerts, 'alert'),
+  ].filter(Boolean)
+  return <p className="muted today-summary">{parts.length ? parts.join(' · ') : 'All caught up.'}</p>
+}
+
+function TodayFrame({ heading, summary, children }: { heading: string; summary?: ReactNode; children: ReactNode }) {
   return (
-    <section className="page">
-      <PageHeader title={heading} />
+    <section className="page today">
+      <header className="page-header">
+        <p className="eyebrow">{greeting()}</p>
+        <h1>{heading}</h1>
+        {summary}
+      </header>
       {children}
     </section>
   )
