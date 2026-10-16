@@ -107,7 +107,7 @@ describe('signed in', () => {
     renderAt('/')
     const nav = await screen.findByRole('navigation', { name: 'Main' })
     const labels = Array.from(nav.querySelectorAll('a')).map((a) => a.textContent)
-    expect(labels).toEqual(['Today', 'Schedule', 'Clients', 'Reminders', 'More'])
+    expect(labels).toEqual(['Today', 'Schedule', 'Reminders', 'Clients', 'More'])
     expect(screen.getByRole('link', { name: 'Today' })).toHaveClass('active')
   })
 

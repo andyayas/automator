@@ -7,14 +7,17 @@ import { updateClient } from '../lib/api'
 import { SETTING } from '../lib/defaults'
 import { formatPhone, normalizePhone } from '../lib/phone'
 import { useInvalidate, useReminders, useScheduleDay, useSettings } from '../lib/queries'
-import { DEFAULT_REMINDER_TEMPLATE, renderReminder, tomorrowISO, whatsappUrl } from '../lib/reminders'
+import { DEFAULT_REMINDER_TEMPLATE, renderReminder, whatsappUrl } from '../lib/reminders'
 import { formatSlotTime } from '../lib/schedule'
 import { markReminderSent, markReminderUnsent, type Reminder, type ScheduleEntry } from '../lib/schedule-api'
-import { formatTime } from '../lib/format'
+import { formatTime, todayISO } from '../lib/format'
+import { reminderQueue, sentReminder } from '../lib/reminder-queue'
+import { workingDay } from '../lib/review-days'
 
 export function RemindersPage() {
   const [params, setParams] = useSearchParams()
-  const date = params.get('date') ?? tomorrowISO()
+  // The next working day (Saturday evening -> Monday), like Today's shortcut and the menu count.
+  const date = params.get('date') ?? workingDay(todayISO(), 1)
   const entries = useScheduleDay(date)
   const reminders = useReminders(date)
   const settings = useSettings()
@@ -25,13 +28,8 @@ export function RemindersPage() {
   const template = (settings.data?.[SETTING.reminderTemplate] as string | undefined) || DEFAULT_REMINDER_TEMPLATE
   const senderName = (settings.data?.[SETTING.senderName] as string | undefined) ?? ''
 
-  // Clients only, not cancelled; a client booked twice that day gets one row per slot.
-  const queue = useMemo(
-    () => (entries.data ?? []).filter((e) => !e.is_non_client && e.status !== 'cancelled'),
-    [entries.data],
-  )
-  const sentFor = (e: ScheduleEntry): Reminder | undefined =>
-    reminders.data?.find((r) => r.client_id === e.client_id && r.slot_time.slice(0, 5) === e.slot_time.slice(0, 5) && r.sent_at)
+  const queue = useMemo(() => reminderQueue(entries.data ?? []), [entries.data])
+  const sentFor = (e: ScheduleEntry): Reminder | undefined => sentReminder(e, reminders.data)
   const sentCount = queue.filter((e) => sentFor(e)).length
 
   async function onSend(e: ScheduleEntry) {

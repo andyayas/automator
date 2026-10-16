@@ -489,7 +489,7 @@ Each phase ends with something she can use. Run tests against `samples/`
 locally before calling a phase done.
 
 1. **Foundation** *(done 2026-10-15)*: Vite app, hash router, login screen (email + password), and a
-   mobile layout with bottom navigation (Today, Schedule, Clients, Reminders,
+   mobile layout with bottom navigation (Today, Schedule, Reminders, Clients,
    More). Screens can be placeholders until their phase. Supabase migrations with RLS on every
    table. GitHub Actions deploy to Pages. *Done when* she can log in on her phone
    and a second test account cannot read her rows.

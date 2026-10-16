@@ -161,6 +161,30 @@ li + li {
   height: 24px;
 }
 
+/* A count on a tab, like a phone's app badge: only things she has to act on. */
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.nav-badge {
+  position: absolute;
+  top: -5px;
+  left: 15px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 2px solid var(--surface);
+  background: #e5484d;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  box-sizing: border-box;
+}
+
 /* Wide screens: side rail instead of bottom bar. */
 @media (min-width: 900px) {
   .shell {
