@@ -559,6 +559,10 @@ locally before calling a phase done.
    and confirms, then the report is generated from the template, downloaded,
    and saved to Storage. The template is built into the app; Settings can
    upload a replacement to the private bucket.
+   The review runs in four steps (`src/components/ReviewSteps.tsx`): Data
+   (cash upload + live sheet), Clients (flagged first), Money (expenses,
+   other income), Confirm (totals, preview, confirm). It opens on Clients when
+   the data is already in.
    *Done when* rebuilding the September days reproduces the old reports'
    clients and amounts, or every difference is explained.
 

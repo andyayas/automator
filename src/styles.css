@@ -1374,3 +1374,174 @@ details.card[open] > summary {
     animation: none;
   }
 }
+
+/* ---------- Daily review steps ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.step-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  position: relative;
+}
+
+/* The line joining the step circles. */
+.step-bar::before {
+  content: '';
+  position: absolute;
+  top: 17px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: var(--border);
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.step-dot {
+  position: relative;
+}
+
+/* Something to check on that step: a small bubble on its circle. */
+.step-count {
+  position: absolute;
+  top: -6px;
+  right: -10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--warn);
+  color: var(--surface);
+  font-size: 0.72rem;
+  line-height: 20px;
+  text-align: center;
+}
+
+.step-dot svg {
+  width: 18px;
+  height: 18px;
+}
+
+.step.current {
+  color: var(--text);
+}
+
+.step.current .step-dot {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.step.done .step-dot {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.step.attention .step-dot {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+
+.step-nav {
+  position: sticky;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
+}
+
+.step-nav p {
+  margin: 0;
+}
+
+.step-nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.step-nav-buttons .button.primary {
+  flex: 1;
+}
+
+@media (min-width: 900px) {
+  .step-nav {
+    bottom: 16px;
+  }
+}
+
+.money-totals {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 12px;
+}
+
+/* The last step has no Next: Back is a plain button, not a floating bar. */
+.step-nav.last {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.day-totals .list-row {
+  min-height: 44px;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--warn);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { DaySources } from '../components/DaySources'
 import { MonthDownload } from '../components/MonthDownload'
+import { StepBar, StepNav, type ReviewStep } from '../components/ReviewSteps'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
 import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, reopenDay, saveReport } from '../lib/day-api'
@@ -17,6 +18,7 @@ import {
   useDayReview,
   useExpenseLabels,
   useInvalidate,
+  useLatestCashDate,
   usePackages,
   useScheduleDay,
   useSettings,
@@ -57,6 +59,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const labels = useExpenseLabels()
   const settings = useSettings()
   const review = useDayReview(date)
+  const latestCash = useLatestCashDate()
   const invalidate = useInvalidate()
 
   const [edits, setEdits] = useState<DayEdits>(() => loadEdits(date))
@@ -65,6 +68,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [step, setStep] = useState<ReviewStep | null>(null)
+  const [visited, setVisited] = useState<ReviewStep[]>([])
   const first = useRef(true)
 
   useEffect(() => {
@@ -117,6 +122,22 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       asIncome: to === 'income' ? [...new Set([...e.asIncome, ...ids])] : e.asIncome.filter((x) => !ids.includes(x)),
       asSession: to === 'session' ? [...new Set([...e.asSession, ...ids])] : e.asSession.filter((x) => !ids.includes(x)),
     }))
+  // Step 1 is done when the cash statement reaches this day and the schedule is loaded.
+  const cashOk = Boolean(latestCash.data && latestCash.data >= date)
+  const bookings = (entries.data ?? []).filter((e) => !e.is_non_client).length
+  const dataOk = cashOk && Boolean(entries.data?.length)
+
+  // Open on step 1 only when the data isn't in yet; otherwise straight on Clients.
+  // (Set while rendering, React's pattern for state that starts from loaded data.)
+  if (ready && latestCash.isFetched && step === null) setStep(dataOk ? 'clients' : 'data')
+  const current: ReviewStep = step ?? 'data'
+
+  const go = (next: ReviewStep) => {
+    setVisited((v) => (v.includes(current) ? v : [...v, current]))
+    setStep(next)
+    window.scrollTo({ top: 0 })
+  }
+
   const editRow = (key: string, change: RowEdit) => update((e) => ({ ...e, rows: { ...e.rows, [key]: { ...e.rows[key], ...change } } }))
 
   if (review.isError || entries.isError || cash.isError) {
@@ -200,6 +221,12 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     expenses: expenses.reduce((s, e) => s + e.amount, 0),
     otherIncome: otherIncome.reduce((s, e) => s + e.amount, 0),
   }
+  const net = totals.collected + totals.otherIncome - totals.expenses
+  const marks = {
+    data: { done: dataOk },
+    clients: { done: !attention.length && (visited.includes('clients') || current === 'money' || current === 'confirm'), count: attention.length },
+    money: { done: visited.includes('money') },
+  }
 
   return (
     <section className="page">
@@ -207,7 +234,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       <DateNav date={date} onChange={onDate} />
       {error && <p className="error" role="alert">{error}</p>}
 
-      {!ready || review.isPending ? (
+      {!ready || review.isPending || (!confirmed && !step) ? (
         <Loading />
       ) : confirmed ? (
         <ConfirmedDay
@@ -221,150 +248,224 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
         />
       ) : (
         <>
-          <DaySources date={date} />
-          {!entries.data!.length && <p className="muted small">No schedule loaded for this day yet: refresh it above.</p>}
+          <StepBar current={current} marks={marks} onPick={go} />
 
-          <div className="card day-summary">
-            <div>
-              <p className="strong">{plural(rows.length, 'client')}</p>
-              <p className="muted small">
-                Billed {formatMoney(totals.billed)} · Collected {formatMoney(totals.collected)}
-                {totals.otherIncome ? ` · Other income ${formatMoney(totals.otherIncome)}` : ''} · Expenses {formatMoney(totals.expenses)}
-              </p>
-            </div>
-            {attention.length ? <Badge tone="warn">{attention.length} to check</Badge> : <Badge tone="accent">All clear</Badge>}
-          </div>
-
-          {attention.length > 0 && (
-            <Section title="Needs a look" count={attention.length}>
-              <div className="stack">
-                {attention.map((r) => (
-                  <RowCard
-                    key={r.key}
-                    row={r}
-                    onEdit={() => setEditing(r)}
-                    onLink={() => setLinking(r)}
-                    onFree={() => editRow(r.key, { billingType: 'free', billed: 0 })}
-                    onCame={() => editRow(r.key, {})}
-                    onRemove={() => update((e) => ({ ...e, removed: [...e.removed, r.key] }))}
-                    onIncome={r.status === 'walk-in' && r.cashIds.length ? () => moveCash(r.cashIds, 'income') : undefined}
-                  />
-                ))}
+          {current === 'data' && (
+            <>
+              <p className="muted small">Bring in the day’s money and bookings. The app reads both; nothing to type.</p>
+              <DaySources date={date} />
+              <div className="card list">
+                <div className="list-row">
+                  <span className="row-text">
+                    <span className="strong">Schedule</span>
+                    <span className="muted small">
+                      {entries.data!.length ? `${plural(bookings, 'booking')} for this day` : 'No schedule loaded for this day yet'}
+                    </span>
+                  </span>
+                  {entries.data!.length ? <Badge tone="accent">Loaded</Badge> : <Badge tone="warn">Missing</Badge>}
+                </div>
               </div>
-            </Section>
+            </>
           )}
 
-          {SECTION_ORDER.map((type) => {
-            const list = rows.filter((r) => r.billingType === type && !r.flags.length)
-            if (!list.length) return null
-            return (
-              <Section key={type} title={SECTION_LABEL[type]} count={list.length}>
+          {current === 'clients' && (
+            <>
+              <div className="card day-summary">
+                <div>
+                  <p className="strong">{plural(rows.length, 'client')}</p>
+                  <p className="muted small">
+                    Billed {formatMoney(totals.billed)} · Collected {formatMoney(totals.collected)}
+                  </p>
+                </div>
+                {attention.length ? <Badge tone="warn">{attention.length} to check</Badge> : <Badge tone="accent">All clear</Badge>}
+              </div>
+            {attention.length > 0 && (
+              <Section title="Needs a look" count={attention.length}>
                 <div className="stack">
-                  {list.map((r) => (
-                    <RowCard key={r.key} row={r} onEdit={() => setEditing(r)} />
+                  {attention.map((r) => (
+                    <RowCard
+                      key={r.key}
+                      row={r}
+                      onEdit={() => setEditing(r)}
+                      onLink={() => setLinking(r)}
+                      onFree={() => editRow(r.key, { billingType: 'free', billed: 0 })}
+                      onCame={() => editRow(r.key, {})}
+                      onRemove={() => update((e) => ({ ...e, removed: [...e.removed, r.key] }))}
+                      onIncome={r.status === 'walk-in' && r.cashIds.length ? () => moveCash(r.cashIds, 'income') : undefined}
+                    />
                   ))}
                 </div>
               </Section>
-            )
-          })}
-
-          <button type="button" className="button block" onClick={() => setAdding(true)}>
-            Add a client to this day
-          </button>
-
-          {final!.excluded.length > 0 && (
-            <details className="details card">
-              <summary>Not counted ({final!.excluded.length})</summary>
-              <div className="card list">
-                {final!.excluded.map((r) => (
-                  <div key={r.key} className="list-row">
-                    <span className="row-text">
-                      <span>{r.clientName}</span>
-                      <span className="muted small">
-                        {r.status === 'cancelled' ? 'Cancelled (X)' : r.status === 'rescheduled' ? 'Rescheduled (R)' : 'Removed'}
-                        {r.slotTime ? ` · ${r.slotTime}` : ''}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      className="button small-button"
-                      onClick={() =>
-                        update((e) =>
-                          e.removed.includes(r.key)
-                            ? { ...e, removed: e.removed.filter((k) => k !== r.key) }
-                            : { ...e, restored: [...e.restored, r.key] },
-                        )
-                      }
-                    >
-                      Add back
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
-
-          <Section title="Expenses" count={expenses.length}>
-            {expenses.length ? (
-              <div className="card list">
-                {expenses.map((e) => (
-                  <div key={e.cashId} className="list-row">
-                    <input
-                      className="inline-input"
-                      value={e.label}
-                      aria-label="Expense label"
-                      onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
-                    />
-                    <span className="strong nowrap">{formatMoney(e.amount)}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="empty">No expenses in the cash statement for this day.</p>
             )}
-          </Section>
 
-          <Section title="Other income" count={otherIncome.length}>
-            <p className="muted small">Money in that isn’t a client session: insurer payments, outdoor, tests…</p>
-            {otherIncome.length ? (
-              <div className="card list">
-                {otherIncome.map((e) => (
-                  <div key={e.cashId} className="income-row">
-                    <input
-                      className="inline-input"
-                      value={e.label}
-                      aria-label="Other income label"
-                      onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
-                    />
-                    <div className="income-row-foot">
-                      <span className="strong">{formatMoney(e.amount)}</span>
-                      <button type="button" className="button ghost small-button" onClick={() => moveCash([e.cashId], 'session')}>
-                        It’s a client session
+            {SECTION_ORDER.map((type) => {
+              const list = rows.filter((r) => r.billingType === type && !r.flags.length)
+              if (!list.length) return null
+              return (
+                <Section key={type} title={SECTION_LABEL[type]} count={list.length}>
+                  <div className="stack">
+                    {list.map((r) => (
+                      <RowCard key={r.key} row={r} onEdit={() => setEditing(r)} />
+                    ))}
+                  </div>
+                </Section>
+              )
+            })}
+
+            <button type="button" className="button block" onClick={() => setAdding(true)}>
+              Add a client to this day
+            </button>
+
+            {final!.excluded.length > 0 && (
+              <details className="details card">
+                <summary>Not counted ({final!.excluded.length})</summary>
+                <div className="card list">
+                  {final!.excluded.map((r) => (
+                    <div key={r.key} className="list-row">
+                      <span className="row-text">
+                        <span>{r.clientName}</span>
+                        <span className="muted small">
+                          {r.status === 'cancelled' ? 'Cancelled (X)' : r.status === 'rescheduled' ? 'Rescheduled (R)' : 'Removed'}
+                          {r.slotTime ? ` · ${r.slotTime}` : ''}
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        className="button small-button"
+                        onClick={() =>
+                          update((e) =>
+                            e.removed.includes(r.key)
+                              ? { ...e, removed: e.removed.filter((k) => k !== r.key) }
+                              : { ...e, restored: [...e.restored, r.key] },
+                          )
+                        }
+                      >
+                        Add back
                       </button>
                     </div>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            </>
+          )}
+
+          {current === 'money' && (
+            <>
+            <Section title="Expenses" count={expenses.length}>
+              {expenses.length ? (
+                <div className="card list">
+                  {expenses.map((e) => (
+                    <div key={e.cashId} className="list-row">
+                      <input
+                        className="inline-input"
+                        value={e.label}
+                        aria-label="Expense label"
+                        onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
+                      />
+                      <span className="strong nowrap">{formatMoney(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty">No expenses in the cash statement for this day.</p>
+              )}
+            </Section>
+
+            <Section title="Other income" count={otherIncome.length}>
+              <p className="muted small">Money in that isn’t a client session: insurer payments, outdoor, tests…</p>
+              {otherIncome.length ? (
+                <div className="card list">
+                  {otherIncome.map((e) => (
+                    <div key={e.cashId} className="income-row">
+                      <input
+                        className="inline-input"
+                        value={e.label}
+                        aria-label="Other income label"
+                        onChange={(ev) => update((x) => ({ ...x, labels: { ...x.labels, [e.cashId]: ev.target.value } }))}
+                      />
+                      <div className="income-row-foot">
+                        <span className="strong">{formatMoney(e.amount)}</span>
+                        <button type="button" className="button ghost small-button" onClick={() => moveCash([e.cashId], 'session')}>
+                          It’s a client session
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="empty">None for this day.</p>
+              )}
+            </Section>
+
+              <div className="card money-totals">
+                <span className="muted small">Collected {formatMoney(totals.collected)}</span>
+                <span className="muted small">Other income {formatMoney(totals.otherIncome)}</span>
+                <span className="muted small">Expenses {formatMoney(totals.expenses)}</span>
+                <span className="strong">Net {formatMoney(net)}</span>
+              </div>
+            </>
+          )}
+
+          {current === 'confirm' && (
+            <>
+              <div className="card list day-totals">
+                {[
+                  ['Clients', String(rows.length)],
+                  ['Billed', formatMoney(totals.billed)],
+                  ['Collected', formatMoney(totals.collected)],
+                  ['Other income', formatMoney(totals.otherIncome)],
+                  ['Expenses', formatMoney(totals.expenses)],
+                ].map(([label, value]) => (
+                  <div key={label} className="list-row">
+                    <span className="muted">{label}</span>
+                    <span>{value}</span>
                   </div>
                 ))}
+                <div className="list-row">
+                  <span className="strong">Net</span>
+                  <span className="strong">{formatMoney(net)}</span>
+                </div>
               </div>
-            ) : (
-              <p className="empty">None for this day.</p>
-            )}
-          </Section>
+              {(attention.length > 0 || !dataOk) && (
+                <div className="card notice stack">
+                  {!dataOk && (
+                    <button type="button" className="link-button" onClick={() => go('data')}>
+                      {cashOk ? 'The schedule isn’t loaded for this day' : 'The cash statement isn’t up to date for this day'} ›
+                    </button>
+                  )}
+                  {attention.length > 0 && (
+                    <button type="button" className="link-button" onClick={() => go('clients')}>
+                      {plural(attention.length, 'client')} still {attention.length === 1 ? 'needs' : 'need'} a look ›
+                    </button>
+                  )}
+                </div>
+              )}
+            <div className="confirm-bar">
+              <button type="button" className="button block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onPreview}>
+                Preview report
+              </button>
+              <button type="button" className="button primary block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onConfirm}>
+                {busy ?? 'Confirm and generate report'}
+              </button>
+              <p className="muted small center">
+                Preview only downloads the file. Confirming saves the day and takes these sessions off packages and approvals.
+              </p>
+            </div>
+            </>
+          )}
 
-          <div className="confirm-bar">
-            <button type="button" className="button block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onPreview}>
-              Preview report
-            </button>
-            <button type="button" className="button primary block" disabled={Boolean(busy) || !(rows.length || otherIncome.length || expenses.length)} onClick={onConfirm}>
-              {busy ?? 'Confirm and generate report'}
-            </button>
-            <p className="muted small center">
-              Preview only downloads the file. Confirming saves the day and takes these sessions off packages and approvals.
-            </p>
-          </div>
+          <StepNav
+            current={current}
+            onPick={go}
+            nextNote={current === 'clients' && attention.length ? `${plural(attention.length, 'client')} still ${attention.length === 1 ? 'needs' : 'need'} a look` : undefined}
+          />
+          {current === 'confirm' && <MonthDownload date={date} />}
         </>
       )}
 
-      {ready && <MonthDownload date={date} />}
+      {ready && confirmed && <MonthDownload date={date} />}
 
       {editing && (
         <EditRowDialog
