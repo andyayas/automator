@@ -74,3 +74,33 @@ export const BackIcon = (p: IconProps) => (
     <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
   </Icon>
 )
+
+export const SheetIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4" y="3.5" width="16" height="17" rx="2" />
+    <path d="M4 9h16M4 14.5h16M10 9v11.5" />
+  </Icon>
+)
+
+export const SettingsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M4 7h10M18 7h2M4 17h4M12 17h8" />
+    <circle cx="16" cy="7" r="2" />
+    <circle cx="10" cy="17" r="2" />
+  </Icon>
+)
+
+export const UploadIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5" />
+    <path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
+  </Icon>
+)
+
+export const ContactsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="4.5" y="3" width="15" height="18" rx="2" />
+    <circle cx="12" cy="10" r="2.6" />
+    <path d="M8 17c.6-2 2.1-3 4-3s3.4 1 4 3" />
+  </Icon>
+)
