@@ -6,7 +6,7 @@ import { SheetRefresh } from '../components/SheetRefresh'
 import { Badge, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { activeByClient, bookingContext, type ActiveByClient } from '../lib/booking-context'
 import { SETTING } from '../lib/defaults'
-import { todayISO } from '../lib/format'
+import { formatTime, todayISO } from '../lib/format'
 import { useApprovals, usePackages, useScheduleDay, useSettings } from '../lib/queries'
 import { formatSlotTime } from '../lib/schedule'
 import { tabUrl } from '../lib/google-sheets'
@@ -42,7 +42,7 @@ export function SchedulePage() {
   const meta = [
     // When the day's bookings were last saved, from the sheet or a file, on any device.
     updatedAt
-      ? `Updated ${updatedAt.toLocaleString('en-GB', updatedAt.toDateString() === new Date().toDateString() ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${refreshed.data?.source?.startsWith('Google Sheet') ? '' : ' from a file'}`
+      ? `Updated ${(updatedAt.toDateString() === new Date().toDateString() ? '' : `${updatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, `) + formatTime(updatedAt)}${refreshed.data?.source?.startsWith('Google Sheet') ? '' : ' from a file'}`
       : '',
     bookings.length ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : '',
     toLink ? `${toLink} to check` : '',

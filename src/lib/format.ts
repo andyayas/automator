@@ -52,3 +52,8 @@ export const numberText = (n: number | null | undefined) => (n === null || n ===
 /** Package value per session: round(total / N), so 450 for 12 gives 38. */
 export const perSessionValue = (price: number | null, sessions: number | null) =>
   price !== null && sessions ? Math.round(price / sessions) : null
+
+/** A time of day the way the clinic writes it: "1:20 PM" (like the booking times). */
+export function formatTime(value: Date | string | number): string {
+  return new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { parseContactsRows } from '../lib/contacts'
 import { SETTING } from '../lib/defaults'
-import { plural } from '../lib/format'
+import { formatTime, plural } from '../lib/format'
 import { connectGoogle, GoogleNotConnectedError, googleConfigured, loadGoogleScript } from '../lib/google'
 import { readLiveSheet } from '../lib/google-sheets'
 import { keys, useGoogleStatus, useInvalidate, useSettings } from '../lib/queries'
@@ -147,7 +147,7 @@ export function SheetRefresh({ date, showTime = true }: { date: string; showTime
 
   const failed = !busy ? (lastError.get(sheetUrl) ?? null) : null
   // The Schedule page shows the time itself (when the day was last saved), so it can hide it here.
-  const time = showTime && readAt ? new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null
+  const time = showTime && readAt ? formatTime(readAt) : null
   return (
     <div className="sheet-refresh">
       <div className="sheet-live-row">

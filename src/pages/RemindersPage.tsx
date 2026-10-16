@@ -10,6 +10,7 @@ import { useInvalidate, useReminders, useScheduleDay, useSettings } from '../lib
 import { DEFAULT_REMINDER_TEMPLATE, renderReminder, tomorrowISO, whatsappUrl } from '../lib/reminders'
 import { formatSlotTime } from '../lib/schedule'
 import { markReminderSent, markReminderUnsent, type Reminder, type ScheduleEntry } from '../lib/schedule-api'
+import { formatTime } from '../lib/format'
 
 export function RemindersPage() {
   const [params, setParams] = useSearchParams()
@@ -201,7 +202,7 @@ function ReminderRow({
       ) : sent ? (
         <div className="reminder-actions">
           <span className="small sent-label">
-            ✓ Sent {new Date(sent.sent_at!).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+            ✓ Sent {formatTime(sent.sent_at!)}
           </span>
           <a className="button small-button" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer">
             Open again

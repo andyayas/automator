@@ -12,7 +12,7 @@ import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type Day
 import { applyEdits, emptyEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { monthReportDays, monthUpTo } from '../lib/month-report'
-import { formatDate, formatMoney, numberText, parseNumber, plural, todayISO } from '../lib/format'
+import { formatDate, formatMoney, formatTime, numberText, parseNumber, plural, todayISO } from '../lib/format'
 import {
   useApprovals,
   useClients,
@@ -823,7 +823,7 @@ function ConfirmedDay({
         <div>
           <p className="strong">Confirmed ✓</p>
           <p className="muted small">
-            {formatDate(date)} · {new Date(confirmedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })} ·{' '}
+            {formatDate(date)} · {formatTime(confirmedAt)} ·{' '}
             {plural(sessions.length, 'client')}
           </p>
         </div>
