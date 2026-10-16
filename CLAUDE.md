@@ -192,10 +192,18 @@ Sample: `samples/September 2026.xlsx` (an export of the live sheet).
 - One tab per working day, named like `Tue 22 SEP` (`%a %-d %b`, month uppercase).
   Sundays are skipped and some Saturdays too. A new spreadsheet or tab set exists
   per month.
-- `I1` holds the date.
-- Row 3: therapist names in **B, D, F** (read them, don't hardcode).
+- The date comes from the tab name (`Tue 22 SEP`, no year: the year is the
+  sheet title's, else the month of its link in Settings). Older exports also
+  have it in `I1`, which is used when present.
+- Row 3: therapist names. The reader uses whichever columns from B onward
+  have a name there (`therapistColumns` in `src/lib/schedule.ts`), so both
+  layouts work.
 - Rows 4–33: half-hour slots, `A4` = `7h00 am` … `A33` = `10h00 pm`.
-- Columns **C, E, G** are WhatsApp-reminder formulas. Ignore them.
+- **Layout change (2026-10-16):** the sheet used to have therapists in
+  **B, D, F**, WhatsApp-reminder formulas in **C, E, G** and the date in `I1`.
+  He deleted the formula columns and the date cell, so therapists are now side
+  by side (**B, C, D**). Old exports (September, early October) still have
+  the old layout; both are read the same way.
 - Row 34 `Total Hrs of Sessions`; row 36 `Notes`.
 - A `Contacts` tab: column A name, column B phone (~2,000 real rows, then
   empty ones). Use it as the base client list, for fuzzy matching, and for
@@ -208,11 +216,10 @@ Sample: `samples/September 2026.xlsx` (an export of the live sheet).
   win over Contacts. Contacts is **incomplete**: about a third of the distinct
   names on the schedule aren't in it under any close spelling, so unmatched
   names are normal and get fixed once via an alias.
-- Columns C/E/G currently build WhatsApp links with `REGEXEXTRACT` and an exact
-  `VLOOKUP` against Contacts. They fail (`#N/A`) whenever the cell has a status
-  letter, a session number, two names or a spelling variant. The app replaces
-  this for her with proper name matching. Leave the sheet's links alone for
-  everyone else.
+- The old C/E/G formula columns (`REGEXEXTRACT` + exact `VLOOKUP` against
+  Contacts) failed whenever a cell had a status letter, a session number, two
+  names or a spelling variant. They were removed on 2026-10-16; the app's
+  reminders replace them.
 
 **Cell grammar** (free text, typed by several people, inconsistent):
 

@@ -1,6 +1,6 @@
 // Synthetic names only.
 import { describe, expect, it } from 'vitest'
-import { formatSlotTime, parseScheduleGrids, parseSlotTime } from './schedule'
+import { dateFromTabName, formatSlotTime, parseScheduleGrids, parseSlotTime } from './schedule'
 
 describe('slot times', () => {
   it('parses the sheet labels', () => {
@@ -67,5 +67,47 @@ describe('parseScheduleGrids', () => {
 
   it('ignores the WhatsApp formula columns', () => {
     expect(days[0].rows.some((r) => r.cellRef.startsWith('C'))).toBe(false)
+  })
+})
+
+describe('the cleaned sheet layout (no WhatsApp columns, no date cell)', () => {
+  // Therapists side by side in B/C/D, and I1 empty: the date comes from the tab name.
+  function cleanTab(cells: Record<string, string>): unknown[][] {
+    const rows: unknown[][] = Array.from({ length: 36 }, () => Array(9).fill(null))
+    rows[2][1] = 'Therapist A'
+    rows[2][2] = 'Therapist B'
+    rows[2][3] = 'Therapist C'
+    for (let r = 3; r <= 32; r++) {
+      const minutes = 7 * 60 + (r - 3) * 30
+      const h = Math.floor(minutes / 60)
+      rows[r][0] = `${h % 12 === 0 ? 12 : h % 12}h${String(minutes % 60).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`
+    }
+    for (const [ref, text] of Object.entries(cells)) rows[Number(ref.slice(1)) - 1]['ABCDEFG'.indexOf(ref[0])] = text
+    return rows
+  }
+
+  const days = parseScheduleGrids(
+    [{ name: 'Mon 19 OCT', rows: cleanTab({ B4: 'Jane Testerson C', C5: 'Omar Sample 4 C', D6: 'Lina Example X' }) }],
+    { year: 2026 },
+  )
+
+  it('takes the date from the tab name and the therapists from row 3', () => {
+    expect(days).toHaveLength(1)
+    expect(days[0]).toMatchObject({ date: '2026-10-19', therapists: ['Therapist A', 'Therapist B', 'Therapist C'] })
+  })
+
+  it('reads bookings in the columns right next to each other', () => {
+    const r = days[0].rows
+    expect(r.find((x) => x.cellRef === 'B4')).toMatchObject({ therapist: 'Therapist A', booking: { name: 'Jane Testerson' } })
+    expect(r.find((x) => x.cellRef === 'C5')).toMatchObject({ therapist: 'Therapist B', booking: { name: 'Omar Sample', sessionNo: 4 } })
+    expect(r.find((x) => x.cellRef === 'D6')).toMatchObject({ therapist: 'Therapist C', booking: { status: 'cancelled' } })
+  })
+
+  it('works out the year of a tab name', () => {
+    expect(dateFromTabName('Tue 22 SEP', 2026)).toBe('2026-09-22')
+    expect(dateFromTabName('Sat 3 JAN', null, new Date(2026, 11, 28))).toBe('2027-01-03')
+    expect(dateFromTabName('Mon 30 NOV', null, new Date(2027, 0, 4))).toBe('2026-11-30')
+    expect(dateFromTabName('Contacts', 2026)).toBeNull()
+    expect(dateFromTabName('Wed 31 SEP', 2026)).toBeNull()
   })
 })

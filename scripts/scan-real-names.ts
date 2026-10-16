@@ -32,8 +32,10 @@ for (const file of readdirSync(SAMPLES).filter((f) => f.endsWith('.xlsx') && !f.
     for (const c of parseContacts(wb).contacts) add(c.name)
     for (const tab of wb.SheetNames) {
       const rows = sheetRows(wb.Sheets[tab])
+      // Therapist columns are the ones with a name in row 3 (B/D/F in old exports, B/C/D… since the cleanup).
+      const cols = [1, 2, 3, 4, 5, 6, 7, 8].filter((c) => typeof rows[2]?.[c] === 'string' && String(rows[2][c]).trim())
       for (let r = 3; r <= 32; r++)
-        for (const c of [1, 3, 5]) {
+        for (const c of cols) {
           const cell = parseScheduleCell(rows[r]?.[c])
           if (cell.kind === 'bookings') cell.bookings.forEach((b) => add(b.name))
         }

@@ -98,7 +98,9 @@ export function SheetRefresh({ date }: { date: string }) {
     setState({ kind: 'busy', label: 'Reading the Google Sheet…', auto })
     try {
       const live = await readLiveSheet(sheetUrl)
-      const days = parseScheduleGrids(live.grids, await loadParseOptions())
+      // Day tabs carry no year: the sheet title's year, else the month this link is for.
+      const year = Number(/\b(20\d\d)\b/.exec(live.title)?.[1] ?? month.slice(0, 4))
+      const days = parseScheduleGrids(live.grids, { ...(await loadParseOptions()), year })
       if (!days.length) throw new Error('No day tabs found in that sheet. Check the link in Settings.')
       const result = await runScheduleImport(
         {

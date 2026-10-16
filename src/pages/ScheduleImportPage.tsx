@@ -43,9 +43,10 @@ export function ScheduleImportPage() {
       const workbook = read(await file.arrayBuffer(), { type: 'array', cellDates: true })
       const days = parseScheduleGrids(
         workbook.SheetNames.map((name) => ({ name, rows: sheetRows(workbook.Sheets[name]) })),
-        options,
+        // Day tabs carry no year: take it from the file name ("October 2026.xlsx") when there is one.
+        { ...options, year: Number(/\b(20\d\d)\b/.exec(file.name)?.[1]) || null },
       )
-      if (!days.length) throw new Error('No schedule days found. Is this the schedule export (one tab per day, date in I1)?')
+      if (!days.length) throw new Error('No schedule days found. Is this the schedule export (one tab per day, like “Tue 22 SEP”)?')
       const hasContacts = workbook.SheetNames.some((n) => n.trim().toLowerCase() === 'contacts')
       const contacts = hasContacts ? parseContacts(workbook).contacts : null
       setStep({ kind: 'preview', fileName: file.name, days, contacts })
