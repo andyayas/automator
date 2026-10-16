@@ -1200,6 +1200,9 @@ progress {
   gap: 10px;
 }
 
+.reminder.sent {
+  opacity: 0.8;
+}
 
 .reminder-top {
   display: flex;
@@ -1220,6 +1223,11 @@ progress {
   flex-wrap: wrap;
 }
 
+.sent-label {
+  color: var(--accent);
+  font-weight: 600;
+  margin-right: auto;
+}
 
 .preview {
   margin: 0 0 12px;
@@ -1861,99 +1869,4 @@ details.card[open] > summary {
 
 .row-text.grow {
   min-width: 0;
-}
-
-/* ---------- Reminders ---------- */
-
-.page.reminders {
-  max-width: 680px;
-}
-
-.reminder-progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.reminder-progress p {
-  margin: 0 0 8px;
-}
-
-.reminder-progress .task-icon.done + .grow p {
-  margin: 0;
-}
-
-.progress {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--bg);
-  overflow: hidden;
-}
-
-.progress span {
-  display: block;
-  height: 100%;
-  min-width: 8px;
-  border-radius: 999px;
-  background: var(--whatsapp);
-  transition: width 0.3s ease;
-}
-
-/* Time on the left, like the Schedule cards. */
-.reminder-grid {
-  display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-}
-
-.reminder-time {
-  font-weight: 700;
-  font-size: 0.95rem;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-
-.reminder-body .reminder-meta {
-  margin: 0;
-}
-
-.message-preview {
-  margin-top: -4px;
-}
-
-.message-preview summary {
-  cursor: pointer;
-  color: var(--accent);
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-align: center;
-  list-style: none;
-}
-
-.message-preview summary::-webkit-details-marker {
-  display: none;
-}
-
-.message-preview p {
-  margin: 8px 0 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: var(--bg);
-  white-space: pre-wrap;
-}
-
-.sent-row {
-  gap: 10px;
-}
-
-.sent-tick {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--whatsapp);
-}
-
-.sent-tick svg {
-  width: 20px;
-  height: 20px;
 }

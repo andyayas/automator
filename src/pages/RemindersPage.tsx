@@ -2,8 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { SheetRefresh } from '../components/SheetRefresh'
-import { Badge, Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
-import { CheckIcon } from '../layout/icons'
+import { Badge, Empty, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { updateClient } from '../lib/api'
 import { SETTING } from '../lib/defaults'
 import { formatPhone, normalizePhone } from '../lib/phone'
@@ -31,6 +30,7 @@ export function RemindersPage() {
 
   const queue = useMemo(() => reminderQueue(entries.data ?? []), [entries.data])
   const sentFor = (e: ScheduleEntry): Reminder | undefined => sentReminder(e, reminders.data)
+  const sentCount = queue.filter((e) => sentFor(e)).length
 
   async function onSend(e: ScheduleEntry) {
     if (!e.client_id || !e.client?.phone) return
@@ -48,29 +48,18 @@ export function RemindersPage() {
     }
   }
 
-  // Three groups: fix first (no phone or name not linked), then to send, then sent.
-  const isLinked = (e: ScheduleEntry) => Boolean(e.client_id && e.match_kind !== 'none' && e.match_kind !== 'fuzzy')
-  const needsFix = queue.filter((e) => !sentFor(e) && (!isLinked(e) || !e.client?.phone))
-  const toSend = queue.filter((e) => !sentFor(e) && isLinked(e) && e.client?.phone)
-  const sent = queue.filter((e) => sentFor(e))
-  // Bookings that get no reminder, so nothing disappears silently.
-  const skipped = (entries.data ?? []).filter((e) => !e.is_non_client && e.status === 'cancelled')
-  const dayName = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
-  const messageFor = (e: ScheduleEntry) =>
-    renderReminder(template, { name: e.client?.name ?? e.parsed_name ?? '', date, slotTime: e.slot_time, senderName })
-  const row = (e: ScheduleEntry) => (
-    <ReminderRow
-      key={e.id}
-      entry={e}
-      message={messageFor(e)}
-      onSend={() => onSend(e)}
-      onLink={() => setLinking(e)}
-    />
-  )
-
   return (
-    <section className="page reminders">
-      <PageHeader title="Reminders" />
+    <section className="page">
+      <PageHeader
+        title="Reminders"
+        action={
+          queue.length > 0 && (
+            <Badge tone={sentCount === queue.length ? 'accent' : 'neutral'}>
+              {sentCount === queue.length ? `All ${queue.length} sent ✓` : `${sentCount}/${queue.length} sent`}
+            </Badge>
+          )
+        }
+      />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 
@@ -95,57 +84,29 @@ export function RemindersPage() {
       )}
 
       {queue.length > 0 && (
-        <div className="card reminder-progress">
-          {sent.length === queue.length ? (
-            <span className="task-icon done">
-              <CheckIcon />
-            </span>
-          ) : null}
-          <div className="grow">
-            <p className="strong">
-              {sent.length === queue.length ? `All sent for ${dayName}` : `${sent.length} of ${queue.length} sent`}
-            </p>
-            {sent.length < queue.length && (
-              <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={queue.length} aria-valuenow={sent.length}>
-                <span style={{ width: `${(sent.length / queue.length) * 100}%` }} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {needsFix.length > 0 && (
-        <Section title="Needs a fix" count={needsFix.length}>
-          <div className="stack">{needsFix.map(row)}</div>
-        </Section>
-      )}
-      {toSend.length > 0 && (
-        <Section title="To send" count={toSend.length}>
-          <div className="stack">{toSend.map(row)}</div>
-        </Section>
-      )}
-      {sent.length > 0 && (
-        <Section title="Sent" count={sent.length}>
-          <div className="card list">
-            {sent.map((e) => (
-              <SentRow
+        <>
+          <div className="stack">
+            {queue.map((e) => (
+              <ReminderRow
                 key={e.id}
                 entry={e}
-                sent={sentFor(e)!}
-                message={messageFor(e)}
+                sent={sentFor(e)}
+                message={renderReminder(template, {
+                  name: e.client?.name ?? e.parsed_name ?? '',
+                  date,
+                  slotTime: e.slot_time,
+                  senderName,
+                })}
+                onSend={() => onSend(e)}
                 onUnsend={async (r) => {
                   await markReminderUnsent(r.id)
                   await invalidate.schedule()
                 }}
+                onLink={() => setLinking(e)}
               />
             ))}
           </div>
-        </Section>
-      )}
-      {skipped.length > 0 && (
-        <p className="muted small center">
-          Not reminded: {skipped.map((e) => `${e.client?.name ?? e.parsed_name} (cancelled)`).join(', ')}
-        </p>
+        </>
       )}
 
       {linking && (
@@ -159,41 +120,19 @@ export function RemindersPage() {
   )
 }
 
-/** A reminder already sent: one compact line, with Open again / Undo. */
-function SentRow({ entry: e, sent, message, onUnsend }: { entry: ScheduleEntry; sent: Reminder; message: string; onUnsend: (r: Reminder) => Promise<void> }) {
-  const phone = e.client?.phone
-  return (
-    <div className="list-row sent-row">
-      <span className="sent-tick" aria-hidden="true">
-        <CheckIcon />
-      </span>
-      <span className="row-text grow">
-        <span className="strong truncate">{e.client?.name ?? e.parsed_name}</span>
-        <span className="muted small truncate">
-          <span className="nowrap">{formatSlotTime(e.slot_time.slice(0, 5))}</span> · sent <span className="nowrap">{formatTime(sent.sent_at!)}</span>
-        </span>
-      </span>
-      {phone && (
-        <a className="button small-button" href={whatsappUrl(phone, message)} target="_blank" rel="noreferrer" aria-label="Open in WhatsApp again">
-          Open
-        </a>
-      )}
-      <button type="button" className="button small-button ghost" onClick={() => void onUnsend(sent)}>
-        Undo
-      </button>
-    </div>
-  )
-}
-
 function ReminderRow({
   entry: e,
+  sent,
   message,
   onSend,
+  onUnsend,
   onLink,
 }: {
   entry: ScheduleEntry
+  sent?: Reminder
   message: string
   onSend: () => void
+  onUnsend: (r: Reminder) => Promise<void>
   onLink: () => void
 }) {
   const invalidate = useInvalidate()
@@ -217,33 +156,28 @@ function ReminderRow({
   }
 
   return (
-    <article className="card reminder">
-      <div className="reminder-grid">
-        <span className="reminder-time">{formatSlotTime(e.slot_time.slice(0, 5))}</span>
-        <div className="reminder-body">
-          <div className="reminder-top">
-            <span className="strong">{e.client && linked ? e.client.name : e.parsed_name}</span>
-            <div className="badges">
-              {e.status === 'confirmed' ? (
-                <Badge tone="accent">Already confirmed</Badge>
-              ) : e.status === 'rescheduled' ? (
-                <Badge tone="warn">Rescheduled</Badge>
-              ) : (
-                <Badge>No reply yet</Badge>
-              )}
-            </div>
-          </div>
-          <p className="muted small reminder-meta">
-            {e.therapist}
-            {phoneDigits && linked && (
-              <>
-                {' · '}
-                <span className="nowrap">{formatPhone(phoneDigits)}</span>
-              </>
-            )}
-          </p>
+    <article className={`card reminder ${sent ? 'sent' : ''}`}>
+      <div className="reminder-top">
+        <span className="strong">{e.client && linked ? e.client.name : e.parsed_name}</span>
+        <div className="badges">
+          {e.status === 'confirmed' ? (
+            <Badge tone="accent">Already confirmed</Badge>
+          ) : e.status === 'rescheduled' ? (
+            <Badge tone="warn">Rescheduled</Badge>
+          ) : (
+            <Badge>No reply yet</Badge>
+          )}
         </div>
       </div>
+      <p className="muted small reminder-meta">
+        {formatSlotTime(e.slot_time.slice(0, 5))} · {e.therapist}
+        {phoneDigits && linked && (
+          <>
+            {' · '}
+            <span className="nowrap">{formatPhone(phoneDigits)}</span>
+          </>
+        )}
+      </p>
 
       {!linked ? (
         <div className="booking-check">
@@ -268,16 +202,22 @@ function ReminderRow({
             Save
           </button>
         </form>
-      ) : (
-        <>
-          <a className="button whatsapp block" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer" onClick={onSend}>
-            Send on WhatsApp
+      ) : sent ? (
+        <div className="reminder-actions">
+          <span className="small sent-label">
+            ✓ Sent {formatTime(sent.sent_at!)}
+          </span>
+          <a className="button small-button" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer">
+            Open again
           </a>
-          <details className="message-preview">
-            <summary>See message</summary>
-            <p className="small">{message}</p>
-          </details>
-        </>
+          <button type="button" className="button ghost small-button" onClick={() => void onUnsend(sent)}>
+            Mark not sent
+          </button>
+        </div>
+      ) : (
+        <a className="button whatsapp block" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer" onClick={onSend}>
+          Send on WhatsApp
+        </a>
       )}
       {phoneError && <p className="error small">{phoneError}</p>}
     </article>
