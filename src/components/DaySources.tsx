@@ -18,6 +18,8 @@ export function DaySources({ date }: { date: string }) {
   const [state, setState] = useState<State>({ kind: 'idle' })
   const [password, setPassword] = useState('')
   const [dragging, setDragging] = useState(false)
+  // Dropping a file only makes sense with a mouse (the laptop).
+  const canDrop = typeof window !== 'undefined' && window.matchMedia?.('(hover: hover) and (pointer: fine)').matches
 
   const behind = latest.isFetched && (latest.data ?? '') < date && date <= todayISO()
 
@@ -37,7 +39,13 @@ export function DaySources({ date }: { date: string }) {
   }
 
   return (
-    <div className="day-sources">
+    <div className="card day-sources">
+      <div className="source-row">
+        <span className="strong">Cash statement</span>
+        <span className={`small ${behind ? 'warn-text' : 'muted'}`}>
+          {latest.data ? `In the app up to ${formatDate(latest.data, { short: true })}` : latest.isFetched ? 'Not uploaded yet' : ''}
+        </span>
+      </div>
       <label
         className={`drop-zone ${behind ? 'behind' : ''} ${dragging ? 'dragging' : ''} ${state.kind === 'busy' ? 'busy' : ''}`}
         onDragOver={(e) => {
@@ -52,13 +60,8 @@ export function DaySources({ date }: { date: string }) {
           if (f && state.kind !== 'busy') void upload({ name: f.name, bytes: new Uint8Array(await f.arrayBuffer()) }, null)
         }}
       >
-        <span className="drop-zone-title">
-          {state.kind === 'busy' ? state.label : 'Upload the cash statement. Tap to choose.'}
-        </span>
-        <span className={`small ${behind ? 'warn-text' : 'muted'}`}>
-          {latest.data ? `In the app up to ${formatDate(latest.data, { short: true })}` : latest.isFetched ? 'Not uploaded yet' : ''}
-          {behind ? ': upload today’s file' : ''}
-        </span>
+        <span className="drop-zone-title">{state.kind === 'busy' ? state.label : behind ? 'Upload today’s file' : 'Upload a newer file'}</span>
+        {state.kind !== 'busy' && <span className="muted small">Tap to choose the Excel file{canDrop ? ', or drop it here' : ''}</span>}
         <input
           type="file"
           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

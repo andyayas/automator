@@ -276,7 +276,6 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
 
           {current === 'data' && (
             <>
-              <p className="muted small">Bring in the day’s money and bookings. The app reads both; nothing to type.</p>
               <DaySources date={date} />
               <div className="card schedule-card">
                 <div className="source-row">

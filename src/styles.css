@@ -1192,14 +1192,13 @@ details.card[open] > summary {
 /* Cash statement upload: the whole dashed box is the button (tap, or drop a file on a laptop). */
 .drop-zone {
   position: relative;
-  background: var(--surface);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-height: 120px;
-  padding: 20px 16px;
+  min-height: 104px;
+  padding: 18px 16px;
   border: 1.5px dashed var(--border);
   border-radius: var(--radius);
   text-align: center;
@@ -1415,10 +1414,14 @@ details.card[open] > summary {
   font-weight: 600;
 }
 
-.sheet-refresh.live {
-  flex-direction: row;
+.sheet-live-row {
+  display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.sheet-refresh .error {
+  margin: 0;
 }
 
 .live-dot {
@@ -1427,6 +1430,10 @@ details.card[open] > summary {
   height: 8px;
   border-radius: 999px;
   background: var(--accent);
+}
+
+.live-dot.failed {
+  background: var(--danger);
 }
 
 .live-dot.busy {
@@ -1552,22 +1559,30 @@ details.card[open] > summary {
   color: var(--warn);
 }
 
+/* Back / Next stay at the bottom of the screen; the buttons carry their own look. */
 .step-nav {
   position: sticky;
   bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 6px;
-  padding: 10px;
   margin-top: 4px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.08);
 }
 
 .step-nav p {
   margin: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--warn-soft);
+}
+
+.step-nav-buttons {
+  align-self: stretch;
+}
+
+.step-nav-buttons .button {
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
 }
 
 .step-nav-buttons {
@@ -1592,12 +1607,13 @@ details.card[open] > summary {
   gap: 4px 12px;
 }
 
-/* The last step has no Next: Back is a plain button, not a floating bar. */
+/* The last step has no Next: Back is a plain button, not a floating one. */
 .step-nav.last {
   position: static;
-  padding: 0;
-  border: 0;
-  background: none;
+  align-items: flex-start;
+}
+
+.step-nav.last .button {
   box-shadow: none;
 }
 

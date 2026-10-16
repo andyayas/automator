@@ -16,6 +16,8 @@ export const AUTO_REFRESH_MS = 5 * 60_000
 // Shared by every page, so moving between Schedule, Reminders and a review doesn't re-read each time.
 const lastRead = new Map<string, number>()
 const lastOk = new Map<string, number>()
+// The last failed read, shown on every page until a read succeeds.
+const lastError = new Map<string, string>()
 let running = false
 
 type State =
@@ -101,10 +103,13 @@ export function SheetRefresh({ date }: { date: string }) {
       // Names to link show on the page itself; only say what it can't show.
       const changed = result.plan.confirmedChanged.length
       lastOk.set(sheetUrl, Date.now())
+      lastError.delete(sheetUrl)
       setState({ kind: 'done', text: changed ? `${plural(changed, 'confirmed day')} left as they were` : '' })
     } catch (err) {
       if (err instanceof GoogleNotConnectedError) void queryClient.invalidateQueries({ queryKey: keys.googleStatus })
-      setState({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
+      const text = err instanceof Error ? err.message : String(err)
+      lastError.set(sheetUrl, text)
+      setState({ kind: 'error', text })
     } finally {
       running = false
     }
@@ -140,24 +145,28 @@ export function SheetRefresh({ date }: { date: string }) {
     )
   }
 
+  const failed = !busy ? (lastError.get(sheetUrl) ?? null) : null
+  const time = readAt ? new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null
   return (
-    <div className="sheet-refresh live">
-      <span className={`live-dot${busy ? ' busy' : ''}`} aria-hidden="true" />
-      <p className="muted small grow" role="status">
-        {busy
-          ? state.label
-          : state.kind === 'error'
-            ? ''
-            : `Live from the Google Sheet${readAt ? ` · read at ${new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}${state.kind === 'done' && state.text ? ` · ${state.text}` : ''}`}
-        {state.kind === 'error' && (
-          <span className="error" role="alert">
-            {state.text}
-          </span>
-        )}
-      </p>
-      <button type="button" className="button ghost small-button" disabled={busy} onClick={() => void refresh(false)}>
-        Refresh now
-      </button>
+    <div className="sheet-refresh">
+      <div className="sheet-live-row">
+        <span className={`live-dot${busy ? ' busy' : ''}${failed ? ' failed' : ''}`} aria-hidden="true" />
+        <p className="muted small grow" role="status">
+          {busy
+            ? state.label
+            : failed
+              ? `Couldn’t read the Google Sheet${time ? ` (last read at ${time})` : ''}`
+              : `Live from the Google Sheet${time ? ` · read at ${time}` : ''}${state.kind === 'done' && state.text ? ` · ${state.text}` : ''}`}
+        </p>
+        <button type="button" className="button ghost small-button" disabled={busy} onClick={() => void refresh(false)}>
+          {failed ? 'Try again' : 'Refresh now'}
+        </button>
+      </div>
+      {failed && (
+        <p className="error small" role="alert">
+          {failed}
+        </p>
+      )}
     </div>
   )
 }

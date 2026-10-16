@@ -28,7 +28,9 @@ export type Deps = {
 }
 
 const ALLOWED_ORIGINS = ['https://andyayas.github.io']
-const isAllowedOrigin = (o: string) => ALLOWED_ORIGINS.includes(o) || /^http:\/\/localhost:\d+$/.test(o)
+// Local testing: this machine, or a phone on the same Wi-Fi (private network addresses).
+const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/
+const isAllowedOrigin = (o: string) => ALLOWED_ORIGINS.includes(o) || LOCAL_ORIGIN.test(o)
 
 function cors(req: Request): Record<string, string> {
   const origin = req.headers.get('Origin') ?? ''

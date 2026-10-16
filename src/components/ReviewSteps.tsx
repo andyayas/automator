@@ -47,12 +47,10 @@ export function StepNav({ current, onPick, nextNote }: { current: ReviewStep; on
     <div className={`step-nav${next ? '' : ' last'}`}>
       {nextNote && <p className="small warn-text center">{nextNote}</p>}
       <div className="step-nav-buttons">
-        {prev ? (
+        {prev && (
           <button type="button" className="button" onClick={() => onPick(prev.id)}>
             ‹ Back
           </button>
-        ) : (
-          <span />
         )}
         {next && (
           <button type="button" className="button primary" onClick={() => onPick(next.id)}>

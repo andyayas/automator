@@ -34,8 +34,9 @@ function setup(googleReplies: Array<Record<string, unknown>>, stored: Connection
     )
     return { status: res.status, json: (await res.json()) as Record<string, unknown>, headers: res.headers }
   }
-  return { db, calls, call }
+  return { db, calls, call, deps }
 }
+const setupDeps = () => setup([])
 
 describe('google-token', () => {
   it('refuses callers who are not signed in to the app', async () => {
@@ -95,6 +96,17 @@ describe('google-token', () => {
     expect((await call({ action: 'disconnect' })).json).toEqual({ ok: true })
     expect(calls[0].url).toContain('/revoke')
     expect(db.size).toBe(0)
+  })
+
+  it('answers the live site and local testing, not other sites', async () => {
+    const { deps } = setupDeps()
+    const origin = async (o: string) =>
+      (await handle(new Request('https://fn.test/google-token', { method: 'OPTIONS', headers: { Origin: o } }), deps)).headers.get('Access-Control-Allow-Origin')
+    expect(await origin('https://andyayas.github.io')).toBe('https://andyayas.github.io')
+    expect(await origin('http://localhost:5173')).toBe('http://localhost:5173')
+    expect(await origin('http://192.168.18.156:5180')).toBe('http://192.168.18.156:5180')
+    expect(await origin('https://evil.example')).toBeNull()
+    expect(await origin('http://192.168.1.5.evil.example:80')).toBeNull()
   })
 
   it('reads the email from an id token', () => {
