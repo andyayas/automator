@@ -6,9 +6,10 @@
   --text: #111827;
   --muted: #6b7280;
   --border: #e3e6eb;
-  --accent: #0f766e;
+  /* Ocean blue: blue = tap this, amber = a problem, red = careful. */
+  --accent: #1d4ed8;
   --accent-contrast: #ffffff;
-  --accent-soft: #e6f4f2;
+  --accent-soft: #e8eefd;
   --danger: #b42318;
   --danger-soft: #fdecea;
   --warn: #9a5b00;
@@ -32,9 +33,9 @@
     --text: #e6e8eb;
     --muted: #9aa3ad;
     --border: #2a313a;
-    --accent: #2dd4bf;
-    --accent-contrast: #04201d;
-    --accent-soft: #10302c;
+    --accent: #7aa7ff;
+    --accent-contrast: #071330;
+    --accent-soft: #15223f;
     --danger: #ff8a80;
     --danger-soft: #3a1714;
     --warn: #f5b84a;
@@ -1378,8 +1379,8 @@ details.card[open] > summary {
 }
 
 .task-icon.todo {
-  background: var(--warn-soft);
-  color: var(--warn);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 /* A coloured edge shows how urgent each alert is. */
@@ -1403,8 +1404,9 @@ details.card[open] > summary {
   padding: 12px 16px;
 }
 
-.earlier-days .strong {
-  color: var(--warn);
+.card.notice.earlier-days {
+  background: var(--surface);
+  border-color: var(--border);
 }
 
 .chips {

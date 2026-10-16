@@ -158,7 +158,7 @@ function InsuranceTab({ query }: { query: string }) {
 
 function StatusOrRemaining({ item, total }: { item: PackageWithBalance | ApprovalWithBalance; total: number }) {
   if (item.status === 'active') return <RemainingBadge remaining={item.sessions_remaining} total={total} />
-  if (item.status === 'proposed') return <Badge tone="warn">To review</Badge>
+  if (item.status === 'proposed') return <Badge tone="accent">To review</Badge>
   return <Badge>{item.status === 'finished' ? 'Finished' : 'Cancelled'}</Badge>
 }
 

@@ -79,7 +79,7 @@ export function Badge({ tone = 'neutral', children }: { tone?: Tone; children: R
   return <span className={`badge ${tone}`}>{children}</span>
 }
 
-const STATUS_TONE: Record<Status, Tone> = { proposed: 'warn', active: 'accent', finished: 'neutral', cancelled: 'neutral' }
+const STATUS_TONE: Record<Status, Tone> = { proposed: 'accent', active: 'accent', finished: 'neutral', cancelled: 'neutral' }
 const STATUS_LABEL: Record<Status, string> = { proposed: 'To review', active: 'Active', finished: 'Finished', cancelled: 'Cancelled' }
 
 export function StatusBadge({ status }: { status: Status }) {

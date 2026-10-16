@@ -22,7 +22,7 @@ export function DailyReviewCard() {
               <span className="muted small">{dayLabel(date)}</span>
             </span>
             <span className="badges">
-              {confirmed ? <Badge tone="accent">Confirmed</Badge> : <Badge tone="warn">To review</Badge>}
+              {confirmed ? <Badge tone="accent">Confirmed</Badge> : <Badge tone="accent">To review</Badge>}
               <span className="chevron">›</span>
             </span>
           </Link>
