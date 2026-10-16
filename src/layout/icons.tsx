@@ -68,3 +68,9 @@ export const PendingIcon = (p: IconProps) => (
     <path d="M12 7.5V12l3 2" />
   </Icon>
 )
+
+export const BackIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <path d="m14.5 5.5-6.5 6.5 6.5 6.5" />
+  </Icon>
+)

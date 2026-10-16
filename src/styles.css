@@ -393,12 +393,34 @@ li + li {
   overflow-wrap: anywhere;
 }
 
+/* Back: a chevron on the left of the title, with a full-size tap area. */
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
 .back-link {
-  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin-left: -12px;
+  border-radius: 999px;
   color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-  padding: 4px 0;
+}
+
+.back-link svg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 2.4;
+}
+
+.back-link:active {
+  background: var(--accent-soft);
 }
 
 .section {

@@ -1,17 +1,20 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
+import { BackIcon } from '../layout/icons'
 import type { Status } from '../lib/api'
 
 export function PageHeader({ title, back, action }: { title: string; back?: string; action?: ReactNode }) {
   return (
     <header className="page-header">
-      {back && (
-        <Link to={back} className="back-link" aria-label="Back">
-          ‹ Back
-        </Link>
-      )}
       <div className="page-header-row">
-        <h1>{title}</h1>
+        <div className="page-title">
+          {back && (
+            <Link to={back} className="back-link" aria-label="Back">
+              <BackIcon />
+            </Link>
+          )}
+          <h1>{title}</h1>
+        </div>
         {action}
       </div>
     </header>
