@@ -6,9 +6,15 @@ import { SETTING } from '../lib/defaults'
 import { formatTime, plural } from '../lib/format'
 import { connectGoogle, GoogleNotConnectedError, googleConfigured, loadGoogleScript } from '../lib/google'
 import { readLiveSheet } from '../lib/google-sheets'
-import { keys, useGoogleStatus, useInvalidate, useSettings } from '../lib/queries'
+import { keys, useGoogleStatus, useInvalidate, useLastSheetRead, useSettings } from '../lib/queries'
 import { parseScheduleGrids } from '../lib/schedule'
 import { loadParseOptions, runScheduleImport } from '../lib/schedule-run'
+
+/** "1:51 PM" today, "15 Oct, 6:05 PM" on an earlier day. */
+function readTime(at: number): string {
+  const d = new Date(at)
+  return d.toDateString() === new Date().toDateString() ? formatTime(d) : `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, ${formatTime(d)}`
+}
 
 /** How often the sheet is read again while the app is open (and at most that often on reopening). */
 export const AUTO_REFRESH_MS = 5 * 60_000
@@ -32,11 +38,12 @@ type State =
  * by itself: on opening the page, on coming back to the app, and every few
  * minutes.
  */
-export function SheetRefresh({ date, showTime = true }: { date: string; showTime?: boolean }) {
+export function SheetRefresh({ date }: { date: string }) {
   const settings = useSettings()
   const invalidate = useInvalidate()
   const [state, setState] = useState<State>({ kind: 'idle' })
   const status = useGoogleStatus()
+  const lastSaved = useLastSheetRead()
   const queryClient = useQueryClient()
   const connected = status.data?.connected ?? false
 
@@ -131,7 +138,8 @@ export function SheetRefresh({ date, showTime = true }: { date: string; showTime
   }
 
   const busy = state.kind === 'busy'
-  const readAt = lastOk.get(sheetUrl)
+  // This device's last read, else the last one saved from any device.
+  const readAt = lastOk.get(sheetUrl) ?? (lastSaved.data ? Date.parse(lastSaved.data) : undefined)
   if (!connected && !busy) {
     return (
       <div className="sheet-refresh">
@@ -149,8 +157,7 @@ export function SheetRefresh({ date, showTime = true }: { date: string; showTime
   }
 
   const failed = !busy ? (lastError.get(sheetUrl) ?? null) : null
-  // The Schedule page shows the time itself (when the day was last saved), so it can hide it here.
-  const time = showTime && readAt ? formatTime(readAt) : null
+  const time = readAt ? readTime(readAt) : null
   return (
     <div className="sheet-refresh">
       <div className="sheet-live-row">

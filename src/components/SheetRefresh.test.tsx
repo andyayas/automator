@@ -35,6 +35,7 @@ vi.mock('../lib/queries', async () => {
       },
     }),
     useInvalidate: () => ({ schedule: async () => {}, clients: async () => {} }),
+    useLastSheetRead: () => ({ data: null }),
   }
 })
 

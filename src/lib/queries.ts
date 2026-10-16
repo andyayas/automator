@@ -50,6 +50,8 @@ export const useApproval = (id: string) =>
   useQuery({ queryKey: keys.approval(id), queryFn: () => api.fetchApproval(id), enabled: Boolean(id) })
 export const useInsurers = () => useQuery({ queryKey: keys.insurers, queryFn: api.fetchInsurers })
 
+// Under 'schedule' so every sheet import refreshes it.
+export const useLastSheetRead = () => useQuery({ queryKey: ['schedule', 'last-sheet-read'], queryFn: sched.fetchLastSheetRead })
 export const useScheduleDay = (date: string) =>
   useQuery({ queryKey: keys.schedule(date), queryFn: () => sched.fetchScheduleDay(date) })
 export const useReminders = (date: string) =>

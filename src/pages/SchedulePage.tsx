@@ -40,9 +40,9 @@ export function SchedulePage() {
   const therapists = [...new Set(list.map((e) => e.therapist))]
   const updatedAt = refreshed.data ? new Date(refreshed.data.importedAt) : null
   const meta = [
-    // When the day's bookings were last saved, from the sheet or a file, on any device.
-    updatedAt
-      ? `Updated ${(updatedAt.toDateString() === new Date().toDateString() ? '' : `${updatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, `) + formatTime(updatedAt)}${refreshed.data?.source?.startsWith('Google Sheet') ? '' : ' from a file'}`
+    // With a live sheet the line above shows the time; a file upload says so here.
+    updatedAt && !refreshed.data?.source?.startsWith('Google Sheet')
+      ? `Updated ${(updatedAt.toDateString() === new Date().toDateString() ? '' : `${updatedAt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}, `) + formatTime(updatedAt)} from a file`
       : '',
     bookings.length ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : '',
     toLink ? `${toLink} to check` : '',
@@ -63,7 +63,7 @@ export function SchedulePage() {
         }
       />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
-      <SheetRefresh date={date} showTime={false} />
+      <SheetRefresh date={date} />
 
       {meta && (
         <div className="schedule-meta">

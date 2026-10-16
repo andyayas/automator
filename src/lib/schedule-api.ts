@@ -40,6 +40,19 @@ export async function fetchScheduleImport(importId: string) {
   return { importedAt: data.imported_at, source: data.filename, gids: details.gids ?? {} }
 }
 
+/** When the live sheet was last read into the app, from any device (null if never). */
+export async function fetchLastSheetRead(): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('imports')
+    .select('imported_at')
+    .eq('kind', 'schedule')
+    .like('filename', 'Google Sheet%')
+    .order('imported_at', { ascending: false })
+    .limit(1)
+  fail(error)
+  return data[0]?.imported_at ?? null
+}
+
 export async function fetchAllAliases(): Promise<Map<string, string>> {
   const map = new Map<string, string>()
   for (let from = 0; ; from += 1000) {
