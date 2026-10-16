@@ -32,7 +32,7 @@ type State =
  * by itself: on opening the page, on coming back to the app, and every few
  * minutes.
  */
-export function SheetRefresh({ date }: { date: string }) {
+export function SheetRefresh({ date, showTime = true }: { date: string; showTime?: boolean }) {
   const settings = useSettings()
   const invalidate = useInvalidate()
   const [state, setState] = useState<State>({ kind: 'idle' })
@@ -146,7 +146,8 @@ export function SheetRefresh({ date }: { date: string }) {
   }
 
   const failed = !busy ? (lastError.get(sheetUrl) ?? null) : null
-  const time = readAt ? new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null
+  // The Schedule page shows the time itself (when the day was last saved), so it can hide it here.
+  const time = showTime && readAt ? new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null
   return (
     <div className="sheet-refresh">
       <div className="sheet-live-row">

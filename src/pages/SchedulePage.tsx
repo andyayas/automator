@@ -38,10 +38,11 @@ export function SchedulePage() {
   const bookings = list.filter((e) => !e.is_non_client)
   const toLink = bookings.filter((e) => e.match_kind === 'none' || e.match_kind === 'fuzzy').length
   const therapists = [...new Set(list.map((e) => e.therapist))]
+  const updatedAt = refreshed.data ? new Date(refreshed.data.importedAt) : null
   const meta = [
-    // With a live sheet the status line above already says when it was read.
-    !monthSheet && refreshed.data
-      ? `Updated ${new Date(refreshed.data.importedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} from a file`
+    // When the day's bookings were last saved, from the sheet or a file, on any device.
+    updatedAt
+      ? `Updated ${updatedAt.toLocaleString('en-GB', updatedAt.toDateString() === new Date().toDateString() ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${refreshed.data?.source?.startsWith('Google Sheet') ? '' : ' from a file'}`
       : '',
     bookings.length ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : '',
     toLink ? `${toLink} to check` : '',
@@ -62,11 +63,11 @@ export function SchedulePage() {
         }
       />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
-      <SheetRefresh date={date} />
+      <SheetRefresh date={date} showTime={false} />
 
       {meta && (
         <div className="schedule-meta">
-          <span className="muted small">{meta}</span>
+          <span className="muted small center">{meta}</span>
         </div>
       )}
 
