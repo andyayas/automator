@@ -77,9 +77,6 @@ export function MonthSheetCreator({ onlyFromDay }: { onlyFromDay?: number }) {
           {busy ? state.label : `Create ${name} sheet`}
         </button>
       </div>
-      {status.data.connected && !status.data.canCreate && !busy && (
-        <p className="muted small">Google will ask once more, to let the app create sheets (it can only reach the ones it creates).</p>
-      )}
       {state.kind === 'error' && (
         <p className="error small" role="alert">
           {state.text}
