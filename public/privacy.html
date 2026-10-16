@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clinic Admin – Privacy</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --surface: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e3e6eb;
+      --accent: #0f766e;
+      color-scheme: light dark;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      line-height: 1.6;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --text: #e6e8eb;
+        --muted: #9aa3ad;
+        --border: #2a313a;
+        --accent: #2dd4bf;
+      }
+    }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    main { max-width: 680px; margin: 0 auto; padding: 32px 16px 48px; }
+    h1 { margin: 0 0 4px; font-size: 1.6rem; }
+    h2 { margin: 28px 0 8px; font-size: 1.05rem; }
+    p, li { margin: 0 0 10px; }
+    ul { padding-left: 20px; }
+    .muted { color: var(--muted); }
+    a { color: var(--accent); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 4px 20px 12px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Privacy</h1>
+    <p class="muted">Clinic Admin · last updated 16 October 2026</p>
+
+    <div class="card">
+      <h2>What this app is</h2>
+      <p>
+        Clinic Admin is a private tool used by one clinic administrator to prepare her daily report, track client
+        packages and insurance approvals, and send appointment reminders. It is not open to the public: sign-ups are
+        closed and only her account can sign in.
+      </p>
+
+      <h2>What it reads from Google</h2>
+      <p>
+        With her permission, the app reads the clinic's appointment spreadsheet in Google Sheets, <strong>read-only</strong>
+        (scope <code>spreadsheets.readonly</code>), plus the email address of the Google account she connects, so the app
+        can show which account is connected. It never changes, shares or publishes the spreadsheet.
+      </p>
+
+      <h2>What it keeps</h2>
+      <ul>
+        <li>The schedule entries it reads, so it can show the day's bookings and build the daily report.</li>
+        <li>The Google connection (a refresh token), kept on the app's server and never sent to a browser, so the sheet can
+          be read without signing in to Google every hour.</li>
+      </ul>
+      <p>
+        All data is stored in the app's own database, hosted by Supabase in the EU (Frankfurt), and is visible only to
+        the administrator's account.
+      </p>
+
+      <h2>What it never does</h2>
+      <ul>
+        <li>It does not sell, share or transfer any data to anyone.</li>
+        <li>It does not use the data for advertising, profiling or training AI models.</li>
+        <li>It reads no other Google data: no Gmail, Drive files, contacts or calendar.</li>
+      </ul>
+      <p>
+        The app's use of information received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>,
+        including the Limited Use requirements.
+      </p>
+
+      <h2>Removing access</h2>
+      <p>
+        The connection can be removed at any time in the app (Settings → Google connection → Disconnect), which also
+        revokes it at Google, or from the Google account at
+        <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+      </p>
+
+      <h2>Contact</h2>
+      <p>Questions about this app: use the support email shown on Google's sign-in screen for Clinic Admin.</p>
+    </div>
+  </main>
+</body>
+</html>
