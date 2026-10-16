@@ -1559,10 +1559,8 @@ details.card[open] > summary {
   color: var(--warn);
 }
 
-/* Back / Next stay at the bottom of the screen; the buttons carry their own look. */
+/* Back / Next sit at the end of each step (not floating, so they can't be tapped by mistake). */
 .step-nav {
-  position: sticky;
-  bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1581,9 +1579,6 @@ details.card[open] > summary {
   align-self: stretch;
 }
 
-.step-nav-buttons .button {
-  box-shadow: 0 4px 14px rgb(0 0 0 / 0.12);
-}
 
 .step-nav-buttons {
   display: flex;
@@ -1595,11 +1590,6 @@ details.card[open] > summary {
   flex: 1;
 }
 
-@media (min-width: 900px) {
-  .step-nav {
-    bottom: 16px;
-  }
-}
 
 .money-totals {
   display: grid;
@@ -1607,14 +1597,9 @@ details.card[open] > summary {
   gap: 4px 12px;
 }
 
-/* The last step has no Next: Back is a plain button, not a floating one. */
+/* The last step has no Next: Back sits on the left. */
 .step-nav.last {
-  position: static;
   align-items: flex-start;
-}
-
-.step-nav.last .button {
-  box-shadow: none;
 }
 
 .day-totals .list-row {
