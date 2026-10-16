@@ -32,7 +32,7 @@ export function MorePage() {
         <Link to="/more/settings" className="list-row link">
           <span className="row-text">
             <span>Settings</span>
-            <span className="muted small">Reminder message, sender name, sheet links, staff</span>
+            <span className="muted small">Sheet links, Google, reminder message</span>
           </span>
           <span className="chevron" aria-hidden="true">
             ›

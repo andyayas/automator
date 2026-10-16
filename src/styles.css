@@ -1734,3 +1734,17 @@ details.card[open] > summary {
   min-height: 44px;
 }
 
+
+/* Settings: the advanced part opens below this button. */
+.advanced-toggle {
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.advanced-toggle .chevron {
+  transition: transform 0.15s ease;
+}
+
+.advanced-toggle .chevron.open {
+  transform: rotate(90deg);
+}

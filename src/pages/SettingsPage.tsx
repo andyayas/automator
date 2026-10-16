@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import { removeTemplate, uploadTemplate } from '../lib/day-api'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
@@ -15,6 +16,9 @@ export function SettingsPage() {
   const settings = useSettings()
   const patterns = usePatterns()
   const queryClient = useQueryClient()
+  // In the address, so it stays open after leaving and coming back.
+  const [params, setParams] = useSearchParams()
+  const advanced = params.get('advanced') === '1'
 
   useEffect(() => {
     // First visit: copy the default lists into her account.
@@ -32,20 +36,39 @@ export function SettingsPage() {
   return (
     <section className="page">
       <PageHeader title="Settings" back="/more" />
-      <TemplateSettings />
-      <PriceSettings settings={settings.data} />
-      <ReviewsFromSetting settings={settings.data} />
-      <ReminderSettings settings={settings.data} />
+      {/* What she uses: the month's sheet link, Google, and the reminder message. */}
       <SheetLinks settings={settings.data} />
       {googleConfigured && <GoogleConnection />}
-      <StaffNames settings={settings.data} />
-      <Section title="Not clients">
-        <p className="muted small">
-          Schedule entries that are not client bookings (meetings, breaks…). “Exact” must be the whole cell; “contains”
-          matches anywhere in it.
-        </p>
-        {patterns.isPending ? <Loading /> : <PatternList rows={patterns.data ?? []} />}
-      </Section>
+      <ReminderSettings settings={settings.data} />
+
+      <button
+        type="button"
+        className="button ghost block advanced-toggle"
+        aria-expanded={advanced}
+        onClick={() => setParams(advanced ? {} : { advanced: '1' }, { replace: true })}
+      >
+        {advanced ? 'Hide advanced settings' : 'Advanced settings'}
+        <span className={`chevron ${advanced ? 'open' : ''}`} aria-hidden="true">
+          ›
+        </span>
+      </button>
+
+      {/* Set once, or only changed when the clinic changes how it works. */}
+      {advanced && (
+        <>
+          <PriceSettings settings={settings.data} />
+          <ReviewsFromSetting settings={settings.data} />
+          <TemplateSettings />
+          <StaffNames settings={settings.data} />
+          <Section title="Not clients">
+            <p className="muted small">
+              Schedule entries that are not client bookings (meetings, breaks…). “Exact” must be the whole cell; “contains”
+              matches anywhere in it.
+            </p>
+            {patterns.isPending ? <Loading /> : <PatternList rows={patterns.data ?? []} />}
+          </Section>
+        </>
+      )}
     </section>
   )
 }
