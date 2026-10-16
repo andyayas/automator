@@ -70,11 +70,7 @@ export function RemindersPage() {
       {entries.data && !queue.length && (
         <Empty>
           No bookings to remind for this day.{' '}
-          {!entries.data.length && (
-            <>
-              <Link to="/schedule/import">Update the schedule</Link> if it should have some.
-            </>
-          )}
+          {!entries.data.length && 'If it should have some, check the day in Google Sheets.'}
         </Empty>
       )}
 

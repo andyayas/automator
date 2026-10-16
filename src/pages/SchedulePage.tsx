@@ -41,14 +41,7 @@ export function SchedulePage() {
 
   return (
     <section className="page">
-      <PageHeader
-        title="Schedule"
-        action={
-          <Link className="button" to="/schedule/import">
-            Update
-          </Link>
-        }
-      />
+      <PageHeader title="Schedule" />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 
@@ -73,11 +66,8 @@ export function SchedulePage() {
       {entries.isError && <ErrorCard error={entries.error} retry={() => void entries.refetch()} />}
       {entries.data && !list.length && (
         <div className="card">
-          <p className="strong">No schedule for this day</p>
-          <p className="muted">Upload the schedule export to load the month, or pick another day.</p>
-          <Link className="button primary block" to="/schedule/import">
-            Update schedule
-          </Link>
+          <p className="strong">Nothing on the schedule for this day</p>
+          <p className="muted">The app reads the clinic sheet by itself. If this day should have bookings, check it in Google Sheets, or pick another day.</p>
         </div>
       )}
 
