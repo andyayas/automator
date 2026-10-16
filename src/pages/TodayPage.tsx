@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { BalanceCard } from '../components/BalanceCard'
 import { DailyReviewCard } from '../components/DailyReviewCard'
+import { MonthSheetCreator } from '../components/MonthSheetCreator'
 import { ErrorCard, Loading, Section } from '../components/ui'
 import { CheckIcon } from '../layout/icons'
 import { deleteApproval, deletePackage, setStatus, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
@@ -88,10 +89,13 @@ export function TodayPage() {
         <DailyReviewCard />
       </Section>
 
+      {/* From the 25th: next month's schedule sheet, if it isn't there yet. */}
+      <MonthSheetCreator onlyFromDay={25} />
+
       {noClients && (
         <div className="card">
           <p className="strong">No clients yet</p>
-          <p className="muted">Import them from the schedule's Contacts tab to get started.</p>
+          <p className="muted">Import them from the clinic phone’s contacts to get started.</p>
           <Link className="button primary block" to="/more/import-contacts">
             Import clients
           </Link>

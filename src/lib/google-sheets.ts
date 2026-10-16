@@ -3,6 +3,7 @@
 
 import { clearGoogleToken, getGoogleToken } from './google'
 import type { SheetGrid } from './schedule'
+import { buildMonthSheet, monthTitle } from './month-sheet'
 
 export type SheetTab = { title: string; gid: number }
 export type LiveSheet = { spreadsheetId: string; title: string; tabs: SheetTab[]; grids: SheetGrid[]; contactsRows: unknown[][] | null }
@@ -67,4 +68,42 @@ export async function readLiveSheet(sheetUrl: string): Promise<LiveSheet> {
   for (const t of tabs) params.append('ranges', tabRange(t.title, isContacts(t.title) ? 'A1:B6000' : 'A1:I36'))
   const values = await api<{ valueRanges: Array<{ values?: unknown[][] }> }>(token, `${spreadsheetId}/values:batchGet?${params}`)
   return { spreadsheetId, title: meta.properties.title, tabs, ...toGrids(tabs, values.valueRanges) }
+}
+
+// ---------- Creating next month's sheet ----------
+
+async function send<T>(token: string, url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (res.ok) return (await res.json()) as T
+  if (res.status === 401) clearGoogleToken()
+  const detail = ((await res.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message
+  throw new Error(
+    res.status === 403
+      ? 'Google didn’t allow this. In Settings, tap Connect Google again and allow the app to create its sheets.'
+      : `Google error (${res.status})${detail ? `: ${detail}` : ''}.`,
+  )
+}
+
+/**
+ * Creates `month`'s schedule sheet in the connected Google account (the
+ * clinic's design, see month-sheet.ts) and shares it with `shareWith` (edit
+ * access, with Google's email). Returns its link.
+ */
+export async function createMonthSheet(month: string, therapists: string[], shareWith: string[]): Promise<{ url: string; title: string; shared: string[] }> {
+  const token = await getGoogleToken()
+  const created = await send<{ spreadsheetId: string }>(
+    token,
+    'https://sheets.googleapis.com/v4/spreadsheets?fields=spreadsheetId',
+    buildMonthSheet(month, therapists),
+  )
+  const shared: string[] = []
+  for (const email of shareWith) {
+    await send(token, `https://www.googleapis.com/drive/v3/files/${created.spreadsheetId}/permissions?sendNotificationEmail=true`, {
+      type: 'user',
+      role: 'writer',
+      emailAddress: email,
+    })
+    shared.push(email)
+  }
+  return { url: `https://docs.google.com/spreadsheets/d/${created.spreadsheetId}/edit`, title: monthTitle(month), shared }
 }

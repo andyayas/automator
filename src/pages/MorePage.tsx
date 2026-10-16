@@ -14,7 +14,7 @@ export function MorePage() {
         <Link to="/more/import-contacts" className="list-row link">
           <span className="row-text">
             <span>Import clients</span>
-            <span className="muted small">From the schedule's Contacts tab</span>
+            <span className="muted small">From the phone’s contacts (.vcf)</span>
           </span>
           <span className="chevron" aria-hidden="true">
             ›

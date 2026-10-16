@@ -76,10 +76,10 @@ export function ImportContactsPage() {
 
       <div className="card">
         <p>
-          Upload the schedule export (<span className="strong">.xlsx</span>, its <span className="strong">Contacts</span> tab)
-          or a contacts export from the clinic phone (<span className="strong">.vcf</span>). It is read on this device and new
-          clients are added. For existing clients it only
-          refreshes the Contacts phone. Names and phone fixes you made in the app are kept.
+          Upload a contacts export from the clinic phone (<span className="strong">.vcf</span>), or an older schedule export
+          that still has its <span className="strong">Contacts</span> tab (<span className="strong">.xlsx</span>). It is read on
+          this device and new clients are added. For existing clients it only refreshes the phone from contacts. Names and
+          phone fixes you made in the app are kept.
         </p>
         <p className="muted small">The file itself is not uploaded or changed.</p>
       </div>

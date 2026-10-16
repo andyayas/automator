@@ -40,6 +40,31 @@ export async function fetchScheduleImport(importId: string) {
   return { importedAt: data.imported_at, source: data.filename, gids: details.gids ?? {} }
 }
 
+/**
+ * The therapists on the recent schedule, in the sheet's column order (left to
+ * right), for next month's sheet. From the app's data: staff names stay out of
+ * the repo.
+ */
+export async function fetchRecentTherapists(today: string): Promise<string[]> {
+  const from = new Date(`${today}T00:00:00`)
+  from.setDate(from.getDate() - 14)
+  const { data, error } = await supabase
+    .from('schedule_entries')
+    .select('therapist, cell_ref, date')
+    .gte('date', from.toISOString().slice(0, 10))
+    .lte('date', today)
+    .order('date', { ascending: false })
+    .limit(2000)
+  fail(error)
+  // Each therapist's column on their most recent day.
+  const column = new Map<string, string>()
+  for (const e of data) {
+    const name = e.therapist?.trim()
+    if (name && !name.startsWith('Column ') && !column.has(name)) column.set(name, /^[A-Z]+/.exec(e.cell_ref ?? '')?.[0] ?? 'Z')
+  }
+  return [...column.entries()].sort((a, b) => a[1].length - b[1].length || a[1].localeCompare(b[1])).map(([n]) => n)
+}
+
 /** When the live sheet was last read into the app, from any device (null if never). */
 export async function fetchLastSheetRead(): Promise<string | null> {
   const { data, error } = await supabase

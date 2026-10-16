@@ -7,6 +7,8 @@
 // kept on the device until they expire; the refresh token never reaches it.
 
 const SHEETS_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+/** Lets the app create next month's sheet; it reaches only files it created itself. */
+export const CREATE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const GIS_SRC = 'https://accounts.google.com/gsi/client'
 
 type CodeResponse = { code?: string; error?: string; error_description?: string }
@@ -102,14 +104,20 @@ export async function getGoogleToken(): Promise<string> {
   throw new Error(r.message ?? 'Google access could not be renewed.')
 }
 
-export type GoogleStatus = { connected: boolean; email: string | null; since: string | null }
+/** `canCreate`: the connection allows creating next month's sheet (connections from before that feature don't). */
+export type GoogleStatus = { connected: boolean; email: string | null; since: string | null; canCreate: boolean }
 
 export async function fetchGoogleStatus(): Promise<GoogleStatus> {
   const { supabase } = await import('./supabase')
   const { data, error } = await supabase.rpc('google_connection_status')
   if (error) throw new Error(error.message)
   const row = data?.[0]
-  return { connected: Boolean(row), email: row?.google_email ?? null, since: row?.connected_at ?? null }
+  return {
+    connected: Boolean(row),
+    email: row?.google_email ?? null,
+    since: row?.connected_at ?? null,
+    canCreate: Boolean(row?.scope?.split(' ').includes(CREATE_SCOPE)),
+  }
 }
 
 // ---------- Connecting (one popup, once) ----------
@@ -143,7 +151,7 @@ export async function connectGoogle(): Promise<string | null> {
     oauth
       .initCodeClient({
         client_id: googleClientId,
-        scope: `${SHEETS_SCOPE} openid email`,
+        scope: `${SHEETS_SCOPE} ${CREATE_SCOPE} openid email`,
         ux_mode: 'popup',
         select_account: true,
         callback: (r) => (r.code ? resolve(r.code) : reject(new Error(r.error_description || r.error || 'Google sign-in failed.'))),

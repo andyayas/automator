@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router'
+import { MonthSheetCreator } from '../components/MonthSheetCreator'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import { removeTemplate, uploadTemplate } from '../lib/day-api'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
@@ -38,6 +39,7 @@ export function SettingsPage() {
       <PageHeader title="Settings" back="/more" />
       {/* What she uses: the month's sheet link, Google, and the reminder message. */}
       <SheetLinks settings={settings.data} />
+      <ShareWith settings={settings.data} />
       <ReminderSettings settings={settings.data} />
       {googleConfigured && <GoogleConnection />}
 
@@ -144,9 +146,10 @@ function SheetLinks({ settings }: { settings: Record<string, unknown> }) {
 
   return (
     <Section title="Clinic Google Sheet">
+      <MonthSheetCreator />
       <p className="muted small">
-        Paste the link of each month’s schedule sheet. The Schedule screen then shows “Edit in Google Sheets” for that
-        month. The app never changes the sheet.
+        Each month’s schedule sheet. The app reads it and never changes it; it can create the next month’s sheet for
+        you, or you can paste a link here.
       </p>
       {Object.keys(links).length > 0 && (
         <div className="card list">
@@ -260,6 +263,40 @@ function GoogleConnection() {
           {error}
         </p>
       )}
+    </Section>
+  )
+}
+
+/** Who gets edit access to each new month's sheet the app creates. */
+function ShareWith({ settings }: { settings: Record<string, unknown> }) {
+  const saved = ((settings[SETTING.shareWith] as string[] | undefined) ?? []).join('\n')
+  const [text, setText] = useState(saved)
+  const [problem, setProblem] = useState<string | null>(null)
+  const { save, note, isError } = useSaver()
+
+  async function onSave(e: FormEvent) {
+    e.preventDefault()
+    const emails = text.split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean)
+    const bad = emails.filter((x) => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x))
+    if (bad.length) return setProblem(`Check ${bad.join(', ')}: that doesn’t look like an email.`)
+    setProblem(null)
+    await save(SETTING.shareWith, [...new Set(emails)])
+  }
+
+  return (
+    <Section title="Share new sheets with">
+      <form className="card form" onSubmit={onSave}>
+        <label className="field">
+          <span>Emails, one per line</span>
+          <textarea rows={3} value={text} onChange={(e) => setText(e.target.value)} placeholder="physio@gmail.com" autoCapitalize="off" spellCheck={false} />
+          <span className="hint">They get edit access, and an email from Google, when the app creates a month’s sheet.</span>
+        </label>
+        {problem && <p className="error small">{problem}</p>}
+        {note && <p className={isError ? 'error' : 'muted small'}>{note}</p>}
+        <button type="submit" className="button">
+          Save
+        </button>
+      </form>
     </Section>
   )
 }

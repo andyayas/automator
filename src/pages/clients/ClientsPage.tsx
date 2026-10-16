@@ -208,7 +208,7 @@ function AllClientsTab({ query }: { query: string }) {
     return (
       <div className="card">
         <p className="strong">No clients yet</p>
-        <p className="muted">Import them from the schedule's Contacts tab.</p>
+        <p className="muted">Import them from the clinic phone’s contacts (More → Import clients).</p>
         <Link className="button primary block" to="/more/import-contacts">
           Import clients
         </Link>

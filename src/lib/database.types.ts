@@ -803,6 +803,7 @@ export type Database = {
         Returns: {
           connected_at: string
           google_email: string
+          scope: string
         }[]
       }
       merge_clients: {

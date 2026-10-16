@@ -104,6 +104,9 @@ anything.
       Clinic Admin once.
 - [ ] She connects Google once with the clinic account (Settings → Google
       connection).
+- [ ] Google Cloud → APIs & Services: enable the **Google Drive API** (used to
+      share new month sheets). Google Auth Platform → Data access: add the
+      `.../auth/drive.file` scope.
 - [x] Settings in the app: sender name, and the October sheet link
       (add each new month's link when the new sheet starts).
 - [x] Go-live (2026-10-15): Contacts imported, `npm run seed -- --apply` run.
@@ -120,7 +123,11 @@ anything.
    approvals, name aliases, phone fixes, reminder send log, and her
    confirmations of each day.
 3. **Read-only toward clinic files.** Never write to, re-share, publish or
-   restructure the Google Sheet or the cash statement.
+   restructure the Google Sheet or the cash statement. One exception, by the
+   owner's decision (2026-10-16): the app may **create** each new month's
+   schedule sheet (Google `drive.file` scope, which reaches only files the app
+   created) and share it with the emails in Settings. It still never edits an
+   existing sheet.
 4. **Propose, then confirm.** The schedule is not always the truth (people on it
    sometimes don't come; people pay without being on it). The app drafts each day
    and flags doubts. Sessions are deducted from packages and approvals only after
@@ -155,6 +162,15 @@ anything.
   `supabase secrets set`, never in the repo. Deploy it with
   `supabase functions deploy google-token --project-ref ljwscptbrwpibbbfgdpk --use-api`.
   It connects with the clinic Google account (the one the sheet is shared with).
+- **Next month's sheet** (`src/lib/month-sheet.ts`, `createMonthSheet` in
+  `google-sheets.ts`): Settings, and Today from the 25th, offer "Create
+  <Month> sheet". It builds one tab per Mon–Sat ("Mon 2 NOV") in the clinic's
+  design, kept in the code (`DESIGN`, from the October 2026 export, C/E/G
+  removed, therapist columns wider); the therapist names in row 3 come from
+  the app's last two weeks of schedule (staff names never go in the repo).
+  It saves the link for that month and shares the sheet (edit, Google's
+  email) with `settings.sheet_share_with`. Needs the `drive.file` scope:
+  connections made before it show "Google will ask once more".
 
 ## Security (non-negotiable)
 
@@ -205,7 +221,9 @@ Sample: `samples/September 2026.xlsx` (an export of the live sheet).
   by side (**B, C, D**). Old exports (September, early October) still have
   the old layout; both are read the same way.
 - Row 34 `Total Hrs of Sessions`; row 36 `Notes`.
-- A `Contacts` tab: column A name, column B phone (~2,000 real rows, then
+- A `Contacts` tab (**removed from the live sheet on 2026-10-16**; older
+  exports still have it, and the importer reads it there; phones now come
+  from the clinic phone's .vcf export and her fixes): column A name, column B phone (~2,000 real rows, then
   empty ones). Use it as the base client list, for fuzzy matching, and for
   reminder phone numbers. Phones are stored as numbers that may read back as
   floats (`9613001272.0`). Convert them to digit strings with no `+`, as

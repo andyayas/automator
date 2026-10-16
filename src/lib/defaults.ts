@@ -33,6 +33,8 @@ export const SETTING = {
   cashPassword: 'cash_password',
   /** First day reviewed in the app; earlier days were reported by hand. */
   reviewsFrom: 'reviews_from',
+  /** Emails that get edit access to each new month's sheet. */
+  shareWith: 'sheet_share_with',
 } as const
 
 /** Used when a setting hasn't been set yet. */
