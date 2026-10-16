@@ -184,6 +184,20 @@ li + li {
   }
 }
 
+/* Opened from the home screen: iOS already starts the page below the status
+   bar, so less gap on top; the menu tucks lower, over the home-indicator zone,
+   like native tab bars (never closer than 8px to the edge). */
+@media (display-mode: standalone) and (max-width: 899.98px) {
+  .main {
+    padding-top: 6px;
+    padding-bottom: calc(var(--nav-height) + max(8px, var(--safe-bottom) - 12px) + 28px);
+  }
+
+  .nav {
+    bottom: max(8px, calc(var(--safe-bottom) - 12px));
+  }
+}
+
 /* No blur support: a solid bar so labels stay readable. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .nav {
