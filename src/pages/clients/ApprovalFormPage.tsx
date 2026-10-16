@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { useGoBack } from '../../lib/go-back'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { deleteApproval, saveApproval, type ApprovalWithBalance, type Status } from '../../lib/api'
 import { numberText, parseNumber, todayISO, yesterdayISO } from '../../lib/format'
@@ -19,7 +20,7 @@ export function ApprovalFormPage() {
 }
 
 function ApprovalForm({ approval, clientId }: { approval?: ApprovalWithBalance; clientId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const invalidate = useInvalidate()
   const client = useClient(clientId)
   const insurers = useInsurers()
@@ -70,7 +71,7 @@ function ApprovalForm({ approval, clientId }: { approval?: ApprovalWithBalance; 
         notes: notes.trim() || null,
       })
       await invalidate.balances()
-      navigate(back, { replace: true })
+      goBack(back)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSaving(false)
@@ -82,7 +83,7 @@ function ApprovalForm({ approval, clientId }: { approval?: ApprovalWithBalance; 
     try {
       await deleteApproval(approval.id)
       await invalidate.balances()
-      navigate(back, { replace: true })
+      goBack(back)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

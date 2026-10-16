@@ -1174,15 +1174,25 @@ details.card[open] > summary {
   gap: 12px;
 }
 
-.schedule-source {
-  display: block;
+.schedule-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.schedule-card > :not(.source-row) {
   padding-top: 10px;
   border-top: 1px solid var(--border);
+}
+
+.schedule-card p {
+  margin: 0;
 }
 
 /* Cash statement upload: the whole dashed box is the button (tap, or drop a file on a laptop). */
 .drop-zone {
   position: relative;
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   align-items: center;

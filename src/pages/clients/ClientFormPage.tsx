@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router'
+import { useGoBack } from '../../lib/go-back'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { createClientRecord, updateClient, type Client } from '../../lib/api'
 import { formatPhone, normalizePhone } from '../../lib/phone'
@@ -18,6 +19,7 @@ export function ClientFormPage() {
 
 function ClientForm({ client }: { client?: Client }) {
   const navigate = useNavigate()
+  const goBack = useGoBack()
   const invalidate = useInvalidate()
   const [name, setName] = useState(client?.name ?? '')
   const [phone, setPhone] = useState(client?.phone_override ? formatPhone(client.phone_override) : '')
@@ -39,7 +41,7 @@ function ClientForm({ client }: { client?: Client }) {
       if (client) {
         await updateClient(client.id, changes)
         await invalidate.client(client.id)
-        navigate(back, { replace: true })
+        goBack(back)
       } else {
         const created = await createClientRecord(changes)
         await invalidate.clients()

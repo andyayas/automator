@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { DaySources } from '../components/DaySources'
+import { SheetRefresh } from '../components/SheetRefresh'
 import { StepBar, StepNav, type ReviewStep } from '../components/ReviewSteps'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
@@ -277,8 +278,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
             <>
               <p className="muted small">Bring in the day’s money and bookings. The app reads both; nothing to type.</p>
               <DaySources date={date} />
-              <div className="card list">
-                <div className="list-row">
+              <div className="card schedule-card">
+                <div className="source-row">
                   <span className="row-text">
                     <span className="strong">Schedule</span>
                     <span className="muted small">
@@ -287,6 +288,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
                   </span>
                   {entries.data!.length ? <Badge tone="accent">Loaded</Badge> : <Badge tone="warn">Missing</Badge>}
                 </div>
+                <SheetRefresh date={date} />
               </div>
             </>
           )}

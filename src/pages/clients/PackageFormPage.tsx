@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { useGoBack } from '../../lib/go-back'
 import { ErrorCard, Loading, PageHeader } from '../../components/ui'
 import { deletePackage, savePackage, type PackageWithBalance, type Status } from '../../lib/api'
 import { numberText, parseNumber, perSessionValue, todayISO, yesterdayISO } from '../../lib/format'
@@ -17,7 +18,7 @@ export function PackageFormPage() {
 }
 
 function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: string }) {
-  const navigate = useNavigate()
+  const goBack = useGoBack()
   const invalidate = useInvalidate()
   const client = useClient(clientId)
   const [sessions, setSessions] = useState(numberText(pkg?.sessions_total))
@@ -67,7 +68,7 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
         notes: notes.trim() || null,
       })
       await invalidate.balances()
-      navigate(back, { replace: true })
+      goBack(back)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSaving(false)
@@ -79,7 +80,7 @@ function PackageForm({ pkg, clientId }: { pkg?: PackageWithBalance; clientId: st
     try {
       await deletePackage(pkg.id)
       await invalidate.balances()
-      navigate(back, { replace: true })
+      goBack(back)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

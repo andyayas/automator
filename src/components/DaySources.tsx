@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { PasswordNeeded, cashSummary, prepareCashUpload, saveCashUpload } from '../lib/cash-upload'
 import { formatDate, todayISO } from '../lib/format'
 import { useInvalidate, useLatestCashDate } from '../lib/queries'
-import { SheetRefresh } from './SheetRefresh'
 
 type Loaded = { name: string; bytes: Uint8Array }
 type State =
@@ -12,10 +11,7 @@ type State =
   | { kind: 'done'; text: string }
   | { kind: 'error'; text: string }
 
-/**
- * Top of the daily review: the two things she updates every day, without
- * leaving the page: upload the cash statement, refresh the schedule.
- */
+/** Step 1 of the daily review: upload the cash statement without leaving the page. */
 export function DaySources({ date }: { date: string }) {
   const latest = useLatestCashDate()
   const invalidate = useInvalidate()
@@ -41,7 +37,7 @@ export function DaySources({ date }: { date: string }) {
   }
 
   return (
-    <div className="card day-sources">
+    <div className="day-sources">
       <label
         className={`drop-zone ${behind ? 'behind' : ''} ${dragging ? 'dragging' : ''} ${state.kind === 'busy' ? 'busy' : ''}`}
         onDragOver={(e) => {
@@ -105,9 +101,6 @@ export function DaySources({ date }: { date: string }) {
         </form>
       )}
 
-      <div className="source-row schedule-source">
-        <SheetRefresh date={date} />
-      </div>
     </div>
   )
 }

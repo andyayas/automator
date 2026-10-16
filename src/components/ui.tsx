@@ -1,15 +1,25 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { BackIcon } from '../layout/icons'
+import { useGoBack } from '../lib/go-back'
 import type { Status } from '../lib/api'
 
 export function PageHeader({ title, back, action }: { title: string; back?: string; action?: ReactNode }) {
+  const goBack = useGoBack()
   return (
     <header className="page-header">
       <div className="page-header-row">
         <div className="page-title">
           {back && (
-            <Link to={back} className="back-link" aria-label="Back">
+            <Link
+              to={back}
+              className="back-link"
+              aria-label="Back"
+              onClick={(e) => {
+                e.preventDefault()
+                goBack(back)
+              }}
+            >
               <BackIcon />
             </Link>
           )}
