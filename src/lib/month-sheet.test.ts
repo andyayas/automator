@@ -25,7 +25,8 @@ describe('next month’s sheet', () => {
   const rows = first.data[0].rowData
 
   it('lays out the clinic’s design: title, therapists, 7 am–10 pm slots, totals and notes', () => {
-    expect(body.properties.title).toBe('November 2026')
+    expect(body.properties.title).toBe('Physio November 2026')
+    expect(rows[0].values[0].userEnteredFormat).toMatchObject({ horizontalAlignment: 'CENTER', verticalAlignment: 'MIDDLE' })
     expect(first.properties.title).toBe('Mon 2 NOV')
     expect(first.merges[0]).toMatchObject({ startRowIndex: 0, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 4 })
     const text = (r: number, c: number) => rows[r].values[c].userEnteredValue?.stringValue

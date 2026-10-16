@@ -35,6 +35,11 @@ export function workingDayTabs(month: string): string[] {
   return tabs
 }
 
+/** The file's name in Google Drive: "Physio November 2026". */
+export function sheetFileName(month: string): string {
+  return `Physio ${monthTitle(month)}`
+}
+
 /** "2026-11" -> "November 2026". */
 export function monthTitle(month: string): string {
   return new Date(`${month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
@@ -63,12 +68,12 @@ export function slotLabel(minutes: number): string {
 type Colour = ReturnType<typeof hex>
 const solid = { style: 'SOLID' }
 const borders = { top: solid, bottom: solid, left: solid, right: solid }
-const cell = (value: string | null, background: Colour, extra: { bold?: boolean; size?: number; center?: boolean } = {}) => ({
+const cell = (value: string | null, background: Colour, extra: { bold?: boolean; size?: number; center?: boolean; middle?: boolean } = {}) => ({
   ...(value === null ? {} : { userEnteredValue: { stringValue: value } }),
   userEnteredFormat: {
     backgroundColor: background,
     borders,
-    verticalAlignment: 'BOTTOM',
+    verticalAlignment: extra.middle ? 'MIDDLE' : 'BOTTOM',
     ...(extra.center ? { horizontalAlignment: 'CENTER' } : {}),
     textFormat: { fontFamily: DESIGN.font, bold: Boolean(extra.bold), ...(extra.size ? { fontSize: extra.size } : {}) },
   },
@@ -82,7 +87,7 @@ export function dayGrid(therapists: string[]) {
   const { colours: k } = DESIGN
   const row = (first: Cell, rest: (i: number) => Cell) => ({ values: [first, ...names.map((_, i) => rest(i))] })
   const rows = [
-    row(cell(DESIGN.title, k.title, { bold: true, center: true }), () => cell(null, k.title)),
+    row(cell(DESIGN.title, k.title, { bold: true, center: true, middle: true }), () => cell(null, k.title)),
     row(cell(null, k.title), () => cell(null, k.title)),
     row(cell('Time', k.time, { bold: true }), (i) => cell(names[i], k.therapist, { bold: true, center: true })),
   ]
@@ -106,5 +111,5 @@ export function buildMonthSheet(month: string, therapists: string[]) {
       merges: [{ sheetId, startRowIndex: 0, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: day.columns }],
     }
   })
-  return { properties: { title: monthTitle(month), defaultFormat: { textFormat: { fontFamily: DESIGN.font } } }, sheets }
+  return { properties: { title: sheetFileName(month), defaultFormat: { textFormat: { fontFamily: DESIGN.font } } }, sheets }
 }
