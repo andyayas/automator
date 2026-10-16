@@ -1344,3 +1344,33 @@ details.card[open] > summary {
   color: var(--accent);
   font-weight: 600;
 }
+
+.sheet-refresh.live {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.live-dot.busy {
+  animation: live-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes live-pulse {
+  to {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-dot.busy {
+    animation: none;
+  }
+}

@@ -133,6 +133,11 @@ anything.
   values so the styling survives.
 - **Google Sheet live read (phase 3b)**: Google Identity Services token client
   with scope `spreadsheets.readonly`, calling the Sheets API from the browser.
+  The access token lasts about an hour and is kept in `localStorage` until
+  then. While it's valid, Schedule, Reminders and the daily review re-read the
+  sheet by themselves (on opening, on returning to the app, every 5 minutes).
+  After it expires, one tap ("Connect Google Sheet") asks Google again: the
+  token model can't renew without a popup, and popups need a tap.
 
 ## Security (non-negotiable)
 

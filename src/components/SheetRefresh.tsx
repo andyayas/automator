@@ -1,28 +1,67 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 import { parseContactsRows } from '../lib/contacts'
 import { SETTING } from '../lib/defaults'
 import { plural } from '../lib/format'
-import { googleConfigured } from '../lib/google'
+import { googleConfigured, hasGoogleToken } from '../lib/google'
 import { readLiveSheet } from '../lib/google-sheets'
 import { useInvalidate, useSettings } from '../lib/queries'
 import { parseScheduleGrids } from '../lib/schedule'
 import { loadParseOptions, runScheduleImport } from '../lib/schedule-run'
 
+/** How often the sheet is read again while the app is open (and at most that often on reopening). */
+export const AUTO_REFRESH_MS = 5 * 60_000
+
+// Shared by every page, so moving between Schedule, Reminders and a review doesn't re-read each time.
+const lastRead = new Map<string, number>()
+const lastOk = new Map<string, number>()
+let running = false
+
+type State =
+  | { kind: 'idle' }
+  | { kind: 'busy'; label: string; auto: boolean }
+  | { kind: 'done'; text: string }
+  | { kind: 'error'; text: string }
+
 /**
- * "Refresh from Google Sheet": reads this month's clinic sheet live (read-only)
- * and imports it like an upload. Shown when the month's sheet link is set.
+ * Reads this month's clinic sheet live (read-only) and imports it like an
+ * upload. While Google access is valid (about an hour after she connects) it
+ * does this by itself: on opening the page, on coming back to the app, and
+ * every few minutes. Otherwise one tap asks Google again.
  */
 export function SheetRefresh({ date }: { date: string }) {
   const settings = useSettings()
   const invalidate = useInvalidate()
-  const [state, setState] = useState<{ kind: 'idle' } | { kind: 'busy'; label: string } | { kind: 'done'; text: string } | { kind: 'error'; text: string }>({
-    kind: 'idle',
-  })
+  const [state, setState] = useState<State>({ kind: 'idle' })
+  const [connected, setConnected] = useState(hasGoogleToken)
 
   const month = date.slice(0, 7)
   const sheetUrl = ((settings.data?.[SETTING.sheetLinks] ?? {}) as Record<string, string>)[month]
   const monthName = new Date(`${month}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long' })
+  const refreshRef = useRef<(auto: boolean) => Promise<void>>(async () => {})
+  // The timer below calls the latest refresh (it reads the current sheet link).
+  useEffect(() => {
+    refreshRef.current = refresh
+  })
+
+  useEffect(() => {
+    if (!googleConfigured || !sheetUrl) return
+    const tick = () => {
+      setConnected(hasGoogleToken())
+      if (document.visibilityState !== 'visible' || !hasGoogleToken() || running) return
+      if (Date.now() - (lastRead.get(sheetUrl) ?? 0) < AUTO_REFRESH_MS) return
+      void refreshRef.current(true)
+    }
+    tick()
+    const timer = window.setInterval(tick, 30_000)
+    document.addEventListener('visibilitychange', tick)
+    window.addEventListener('focus', tick)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', tick)
+      window.removeEventListener('focus', tick)
+    }
+  }, [sheetUrl])
 
   if (!googleConfigured || !settings.data) return null
   if (!sheetUrl) {
@@ -33,8 +72,11 @@ export function SheetRefresh({ date }: { date: string }) {
     )
   }
 
-  async function refresh() {
-    setState({ kind: 'busy', label: 'Opening the Google Sheet…' })
+  async function refresh(auto: boolean) {
+    if (running) return
+    running = true
+    lastRead.set(sheetUrl, Date.now())
+    setState({ kind: 'busy', label: auto ? 'Reading the Google Sheet…' : 'Opening the Google Sheet…', auto })
     try {
       const live = await readLiveSheet(sheetUrl)
       const days = parseScheduleGrids(live.grids, await loadParseOptions())
@@ -46,31 +88,57 @@ export function SheetRefresh({ date }: { date: string }) {
           source: `Google Sheet: ${live.title}`,
           details: { gids: Object.fromEntries(live.tabs.map((t) => [t.title, t.gid])) },
         },
-        (label) => setState({ kind: 'busy', label }),
+        (label) => setState({ kind: 'busy', label, auto }),
       )
       await Promise.all([invalidate.schedule(), invalidate.clients()])
-      const extra = [
-        result.plan.unmatched ? `${result.plan.unmatched} to link` : '',
-        result.phonesUpdated ? plural(result.phonesUpdated, 'phone') + ' updated' : '',
-        result.plan.confirmedChanged.length ? `${plural(result.plan.confirmedChanged.length, 'confirmed day')} left as they were` : '',
-      ].filter(Boolean)
-      setState({ kind: 'done', text: `Updated ${plural(result.plan.replace.size, 'day')} from the sheet${extra.length ? ` · ${extra.join(' · ')}` : ''}` })
+      // Names to link show on the page itself; only say what it can't show.
+      const changed = result.plan.confirmedChanged.length
+      lastOk.set(sheetUrl, Date.now())
+      setState({ kind: 'done', text: changed ? `${plural(changed, 'confirmed day')} left as they were` : '' })
     } catch (err) {
       setState({ kind: 'error', text: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setConnected(hasGoogleToken())
+      running = false
     }
   }
 
+  const busy = state.kind === 'busy'
+  const readAt = lastOk.get(sheetUrl)
+  if (!connected && !busy) {
+    return (
+      <div className="sheet-refresh">
+        <button type="button" className="button primary block" onClick={() => void refresh(false)}>
+          Connect Google Sheet
+        </button>
+        <p className="muted small">After you connect, it keeps the schedule up to date by itself for about an hour.</p>
+        {state.kind === 'error' && (
+          <p className="error small" role="alert">
+            {state.text}
+          </p>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="sheet-refresh">
-      <button type="button" className="button primary block" disabled={state.kind === 'busy'} onClick={refresh}>
-        {state.kind === 'busy' ? state.label : 'Refresh from Google Sheet'}
+    <div className="sheet-refresh live">
+      <span className={`live-dot${busy ? ' busy' : ''}`} aria-hidden="true" />
+      <p className="muted small grow" role="status">
+        {busy
+          ? state.label
+          : state.kind === 'error'
+            ? ''
+            : `Live from the Google Sheet${readAt ? ` · read at ${new Date(readAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}${state.kind === 'done' && state.text ? ` · ${state.text}` : ''}`}
+        {state.kind === 'error' && (
+          <span className="error" role="alert">
+            {state.text}
+          </span>
+        )}
+      </p>
+      <button type="button" className="button ghost small-button" disabled={busy} onClick={() => void refresh(false)}>
+        Refresh now
       </button>
-      {state.kind === 'done' && <p className="muted small">{state.text}</p>}
-      {state.kind === 'error' && (
-        <p className="error small" role="alert">
-          {state.text}
-        </p>
-      )}
     </div>
   )
 }
