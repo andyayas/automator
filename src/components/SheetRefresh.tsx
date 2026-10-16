@@ -158,7 +158,7 @@ export function SheetRefresh({ date }: { date: string }) {
               ? `Couldn’t read the Google Sheet${time ? ` (last read at ${time})` : ''}`
               : `Live from the Google Sheet${time ? ` · read at ${time}` : ''}${state.kind === 'done' && state.text ? ` · ${state.text}` : ''}`}
         </p>
-        <button type="button" className="button ghost small-button" disabled={busy} onClick={() => void refresh(false)}>
+        <button type="button" className="button small-button" disabled={busy} onClick={() => void refresh(false)}>
           {failed ? 'Try again' : 'Refresh now'}
         </button>
       </div>

@@ -38,6 +38,16 @@ export function SchedulePage() {
   const bookings = list.filter((e) => !e.is_non_client)
   const toLink = bookings.filter((e) => e.match_kind === 'none' || e.match_kind === 'fuzzy').length
   const therapists = [...new Set(list.map((e) => e.therapist))]
+  const meta = [
+    // With a live sheet the status line above already says when it was read.
+    !monthSheet && refreshed.data
+      ? `Updated ${new Date(refreshed.data.importedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} from a file`
+      : '',
+    bookings.length ? `${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : '',
+    toLink ? `${toLink} to check` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
     <section className="page">
@@ -54,17 +64,11 @@ export function SchedulePage() {
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 
-      <div className="schedule-meta">
-        <span className="muted small">
-          {refreshed.data
-            ? `Updated ${new Date(refreshed.data.importedAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${refreshed.data.source?.startsWith('Google Sheet') ? ' from the sheet' : ' from a file'}`
-            : list.length
-              ? ''
-              : 'Not loaded yet'}
-          {bookings.length ? ` · ${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : ''}
-          {toLink ? ` · ${toLink} to check` : ''}
-        </span>
-      </div>
+      {meta && (
+        <div className="schedule-meta">
+          <span className="muted small">{meta}</span>
+        </div>
+      )}
 
       {entries.isPending && <Loading />}
       {entries.isError && <ErrorCard error={entries.error} retry={() => void entries.refetch()} />}
