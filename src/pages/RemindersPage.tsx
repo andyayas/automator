@@ -213,7 +213,7 @@ function ReminderRow({
           </button>
         </div>
       ) : (
-        <a className="button primary block" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer" onClick={onSend}>
+        <a className="button whatsapp block" href={whatsappUrl(phoneDigits, message)} target="_blank" rel="noreferrer" onClick={onSend}>
           Send on WhatsApp
         </a>
       )}
