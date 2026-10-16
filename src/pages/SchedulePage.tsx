@@ -41,7 +41,16 @@ export function SchedulePage() {
 
   return (
     <section className="page">
-      <PageHeader title="Schedule" />
+      <PageHeader
+        title="Schedule"
+        action={
+          sheetUrl && (
+            <a className="button" href={sheetUrl} target="_blank" rel="noreferrer">
+              Edit in Google Sheets
+            </a>
+          )
+        }
+      />
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 
@@ -55,11 +64,6 @@ export function SchedulePage() {
           {bookings.length ? ` · ${bookings.length} booking${bookings.length === 1 ? '' : 's'}` : ''}
           {toLink ? ` · ${toLink} to check` : ''}
         </span>
-        {sheetUrl && (
-          <a className="button small-button" href={sheetUrl} target="_blank" rel="noreferrer">
-            Edit in Google Sheets
-          </a>
-        )}
       </div>
 
       {entries.isPending && <Loading />}
