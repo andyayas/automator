@@ -163,14 +163,15 @@ anything.
   `supabase functions deploy google-token --project-ref ljwscptbrwpibbbfgdpk --use-api`.
   It connects with the clinic Google account (the one the sheet is shared with).
 - **Next month's sheet** (`src/lib/month-sheet.ts`, `createMonthSheet` in
-  `google-sheets.ts`): Settings, and Today from the 25th, offer "Create
-  <Month> sheet". It builds one tab per Mon–Sat ("Mon 2 NOV") in the clinic's
+  `google-sheets.ts`): **More → New month sheet** (`/more/create-sheet`) picks
+  any month and creates its sheet; Today shows "<Month>'s sheet isn't created
+  yet" from the 25th, linking there. The share list lives on that page. It builds one tab per Mon–Sat ("Mon 2 NOV") in the clinic's
   design, kept in the code (`DESIGN`, from the October 2026 export, C/E/G
   removed, therapist columns wider); the therapist names in row 3 come from
   the app's last two weeks of schedule (staff names never go in the repo).
   It saves the link for that month and shares the sheet (edit, Google's
   email) with `settings.sheet_share_with`. Needs the `drive.file` scope:
-  connections made before it show "Google will ask once more".
+  connections made before it get one more Google consent on the first create.
 
 ## Security (non-negotiable)
 

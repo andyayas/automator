@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { BalanceCard } from '../components/BalanceCard'
 import { DailyReviewCard } from '../components/DailyReviewCard'
-import { MonthSheetCreator } from '../components/MonthSheetCreator'
+import { NextMonthSheetReminder } from '../components/NextMonthSheetReminder'
 import { ErrorCard, Loading, Section } from '../components/ui'
 import { CheckIcon } from '../layout/icons'
 import { deleteApproval, deletePackage, setStatus, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
@@ -90,7 +90,7 @@ export function TodayPage() {
       </Section>
 
       {/* From the 25th: next month's schedule sheet, if it isn't there yet. */}
-      <MonthSheetCreator onlyFromDay={25} />
+      <NextMonthSheetReminder />
 
       {noClients && (
         <div className="card">

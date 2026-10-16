@@ -8,6 +8,7 @@ import { ClientFormPage } from './pages/clients/ClientFormPage'
 import { ClientsPage } from './pages/clients/ClientsPage'
 import { PackageFormPage } from './pages/clients/PackageFormPage'
 import { CashImportPage } from './pages/CashImportPage'
+import { CreateSheetPage } from './pages/CreateSheetPage'
 import { DayReviewPage } from './pages/DayReviewPage'
 import { ImportContactsPage } from './pages/ImportContactsPage'
 import { MorePage } from './pages/MorePage'
@@ -45,6 +46,7 @@ export const routes: RouteObject[] = [
       { path: 'more/import-contacts', element: <ImportContactsPage /> },
       { path: 'more/settings', element: <SettingsPage /> },
       { path: 'more/cash', element: <CashImportPage /> },
+      { path: 'more/create-sheet', element: <CreateSheetPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

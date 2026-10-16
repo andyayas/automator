@@ -20,6 +20,15 @@ export function MorePage() {
             ›
           </span>
         </Link>
+        <Link to="/more/create-sheet" className="list-row link">
+          <span className="row-text">
+            <span>New month sheet</span>
+            <span className="muted small">Create a month’s Google Sheet in the clinic’s design</span>
+          </span>
+          <span className="chevron" aria-hidden="true">
+            ›
+          </span>
+        </Link>
         <Link to="/more/cash" className="list-row link">
           <span className="row-text">
             <span>Upload cash statement</span>
