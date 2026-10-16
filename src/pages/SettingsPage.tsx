@@ -131,8 +131,9 @@ function SheetLinks({ settings }: { settings: Record<string, unknown> }) {
             .sort(([a], [b]) => b.localeCompare(a))
             .map(([m, link]) => (
               <div key={m} className="list-row">
-                <a href={link} target="_blank" rel="noreferrer">
-                  {new Date(`${m}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+                <span className="grow">{new Date(`${m}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</span>
+                <a className="button small-button" href={link} target="_blank" rel="noreferrer">
+                  Open
                 </a>
                 <button
                   type="button"

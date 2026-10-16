@@ -456,14 +456,22 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
               {(attention.length > 0 || !dataOk) && (
                 <div className="card notice stack">
                   {!dataOk && (
-                    <button type="button" className="link-button" onClick={() => go('data')}>
-                      {cashOk ? 'The schedule isn’t loaded for this day' : 'The cash statement isn’t up to date for this day'} ›
-                    </button>
+                    <div className="inline-action">
+                      <p className="small">{cashOk ? 'The schedule isn’t loaded for this day.' : 'The cash statement isn’t up to date for this day.'}</p>
+                      <button type="button" className="button small-button warn" onClick={() => go('data')}>
+                        Go to Data
+                      </button>
+                    </div>
                   )}
                   {attention.length > 0 && (
-                    <button type="button" className="link-button" onClick={() => go('clients')}>
-                      {plural(attention.length, 'client')} still {attention.length === 1 ? 'needs' : 'need'} a look ›
-                    </button>
+                    <div className="inline-action">
+                      <p className="small">
+                        {plural(attention.length, 'client')} still {attention.length === 1 ? 'needs' : 'need'} a look.
+                      </p>
+                      <button type="button" className="button small-button warn" onClick={() => go('clients')}>
+                        Go to Clients
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -787,16 +795,21 @@ function MonthTabsNote({ date, month }: { date: string; month?: { confirmedDates
   const before = month.confirmedDates.filter((d) => d < date).length
   const missing = month.notConfirmed.filter((d) => d < date)
   return (
-    <p className="muted small">
-      {before ? `The report file has ${before + 1} tabs, one for each confirmed day of ${monthName} up to this one.` : 'The report file has this day’s tab.'}
-      {missing.length > 0 && ' Not confirmed yet, so left out: '}
-      {missing.map((d, i) => (
-        <span key={d}>
-          {i ? ', ' : ''}
-          <Link to={`/day/${d}`}>{formatDate(d, { short: true })}</Link>
-        </span>
-      ))}
-    </p>
+    <div className="stack">
+      <p className="muted small">
+        {before ? `The report file has ${before + 1} tabs, one for each confirmed day of ${monthName} up to this one.` : 'The report file has this day’s tab.'}
+        {missing.length > 0 && ' Not confirmed yet, so left out:'}
+      </p>
+      {missing.length > 0 && (
+        <div className="chips">
+          {missing.map((d) => (
+            <Link key={d} to={`/day/${d}`} className="chip">
+              {formatDate(d, { short: true })}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

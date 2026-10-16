@@ -146,9 +146,10 @@ export function TodayPage() {
           <span className="task-icon done">
             <CheckIcon />
           </span>
-          <p className="muted small">
-            No alerts. Packages and approvals are on the <Link to="/clients">Clients</Link> page.
-          </p>
+          <p className="muted small grow">No alerts. Packages and approvals are on the Clients page.</p>
+          <Link className="button small-button" to="/clients">
+            Clients
+          </Link>
         </div>
       )}
     </TodayFrame>

@@ -75,9 +75,12 @@ export function SheetRefresh({ date, showTime = true }: { date: string; showTime
   if (!googleConfigured || !settings.data || !status.data) return null
   if (!sheetUrl) {
     return (
-      <p className="muted small">
-        To read the live sheet, <Link to="/more/settings">add the {monthName} sheet link in Settings</Link>.
-      </p>
+      <div className="inline-action">
+        <p className="muted small">To read the live sheet, add the {monthName} sheet link.</p>
+        <Link className="button small-button" to="/more/settings">
+          Add it in Settings
+        </Link>
+      </div>
     )
   }
 

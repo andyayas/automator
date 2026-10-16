@@ -268,10 +268,37 @@ li + li {
   color: var(--accent-contrast);
 }
 
+/* Secondary actions still look like buttons: white with a coloured label. */
 .button.ghost {
-  border-color: transparent;
-  background: transparent;
+  border-color: var(--border);
+  background: var(--surface);
   color: var(--accent);
+}
+
+/* Remove, delete, discard, didn't come: a soft red button. */
+.button.ghost.danger {
+  border-color: transparent;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* On amber notices: a button that goes and fixes the thing. */
+.button.warn {
+  border-color: var(--warn);
+  background: var(--surface);
+  color: var(--warn);
+}
+
+/* A short message with its button beside it. */
+.inline-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inline-action p {
+  margin: 0;
 }
 
 .button.block {
@@ -1391,6 +1418,7 @@ details.card[open] > summary {
   align-items: center;
   min-height: 32px;
   padding: 0 12px;
+  border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   color: var(--text);
@@ -1409,10 +1437,6 @@ details.card[open] > summary {
   margin: 0;
 }
 
-.all-clear a {
-  color: var(--accent);
-  font-weight: 600;
-}
 
 .sheet-live-row {
   display: flex;
@@ -1606,13 +1630,3 @@ details.card[open] > summary {
   min-height: 44px;
 }
 
-.link-button {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--warn);
-  font: inherit;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-}

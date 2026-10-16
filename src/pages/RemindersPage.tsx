@@ -57,10 +57,11 @@ export function RemindersPage() {
       <SheetRefresh date={date} />
 
       {settings.data && !senderName && (
-        <div className="card notice">
-          <p className="small">
-            Reminders end with your name. <Link to="/more/settings">Set the sender name in Settings</Link> first.
-          </p>
+        <div className="card notice inline-action">
+          <p className="small">Reminders end with your name. Set it first.</p>
+          <Link className="button small-button warn" to="/more/settings">
+            Open Settings
+          </Link>
         </div>
       )}
       {error && <p className="error" role="alert">{error}</p>}
