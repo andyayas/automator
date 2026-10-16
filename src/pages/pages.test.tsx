@@ -108,6 +108,17 @@ describe('Today', () => {
     await userEvent.setup().click(within(review).getByRole('button', { name: 'Accept' }))
     expect(api.setStatus).toHaveBeenCalledWith('package', 'prop1', 'active')
   })
+
+  it('shows notes on proposals but not on active packages', async () => {
+    api.fetchPackages.mockResolvedValue([
+      pkg({ id: 'prop1', status: 'proposed', notes: 'Proposal note' }),
+      pkg({ id: 'act1', client: omar, client_id: 'c2', notes: 'Active note' }),
+    ])
+    renderRoute('/', [{ path: '/', element: <TodayPage /> }])
+    expect(await screen.findByText('Proposal note')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /active packages/i })).toBeInTheDocument()
+    expect(screen.queryByText('Active note')).not.toBeInTheDocument()
+  })
 })
 
 describe('Clients', () => {

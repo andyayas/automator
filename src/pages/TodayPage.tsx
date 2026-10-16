@@ -143,7 +143,7 @@ export function TodayPage() {
         {activePackages.length ? (
           <div className="stack">
             {activePackages.map((p) => (
-              <BalanceCard key={p.id} kind="package" item={p} showClient />
+              <BalanceCard key={p.id} kind="package" item={p} showClient hideNotes />
             ))}
           </div>
         ) : (
@@ -155,7 +155,7 @@ export function TodayPage() {
         {activeApprovals.length ? (
           <div className="stack">
             {activeApprovals.map((a) => (
-              <BalanceCard key={a.id} kind="approval" item={a} showClient />
+              <BalanceCard key={a.id} kind="approval" item={a} showClient hideNotes />
             ))}
           </div>
         ) : (
