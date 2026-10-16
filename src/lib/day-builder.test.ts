@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
 import { applyEdits, emptyEdits, toReportData } from './day-edits'
-import { monthReportDays } from './month-report'
+import { monthReportDays, monthUpTo } from './month-report'
 
 const base = {
   owner_id: 'u',
@@ -324,5 +324,21 @@ describe('other income', () => {
     })
     expect(days[0].data.otherIncome).toEqual([{ label: 'Insurer payment', amount: 900 }])
     expect(days[0].data.expenses).toEqual([{ label: 'Coffee', amount: 6 }])
+  })
+})
+
+describe('monthUpTo', () => {
+  const day = (date: string, label = 'stored') => ({ date, sheetName: date, data: { dateLabel: label } as never })
+  const stored = [day('2026-10-08'), day('2026-10-09'), day('2026-10-15'), day('2026-10-16')]
+
+  it('puts the day being reviewed last, after the confirmed days before it', () => {
+    const out = monthUpTo(stored, '2026-10-15', { dateLabel: 'draft' } as never)
+    expect(out.map((d) => d.date)).toEqual(['2026-10-08', '2026-10-09', '2026-10-15'])
+    expect(out[2].data.dateLabel).toBe('draft')
+    expect(out[2].sheetName).toBe('Thu Oct 15')
+  })
+
+  it('for a confirmed day, rebuilds the month up to and including it', () => {
+    expect(monthUpTo(stored, '2026-10-09', null).map((d) => d.date)).toEqual(['2026-10-08', '2026-10-09'])
   })
 })

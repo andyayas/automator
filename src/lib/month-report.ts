@@ -84,3 +84,15 @@ export function monthReportDays(input: {
     }
   })
 }
+
+type MonthDay = { date: string; sheetName: string; data: ReportData }
+
+/**
+ * Each daily report is the month so far: the confirmed days before `date`,
+ * then `date` itself. `current` is the day being reviewed (preview or confirm),
+ * used in place of whatever is stored for it.
+ */
+export function monthUpTo(days: MonthDay[], date: string, current: ReportData | null): MonthDay[] {
+  const before = days.filter((d) => (current ? d.date < date : d.date <= date))
+  return current ? [...before, { date, sheetName: sheetNameFor(date), data: current }] : before
+}

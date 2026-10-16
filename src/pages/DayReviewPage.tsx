@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { DaySources } from '../components/DaySources'
-import { MonthDownload } from '../components/MonthDownload'
 import { StepBar, StepNav, type ReviewStep } from '../components/ReviewSteps'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
-import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, reopenDay, saveReport } from '../lib/day-api'
+import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, fetchMonth, reopenDay, saveReport } from '../lib/day-api'
 import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type DayRow } from '../lib/day-builder'
 import { applyEdits, emptyEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
+import { monthReportDays, monthUpTo } from '../lib/month-report'
 import { formatDate, formatMoney, numberText, parseNumber, plural, todayISO } from '../lib/format'
 import {
   useApprovals,
@@ -60,6 +61,13 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const settings = useSettings()
   const review = useDayReview(date)
   const latestCash = useLatestCashDate()
+  const reviewsFrom = (settings.data?.[SETTING.reviewsFrom] as string | undefined) ?? null
+  // The month so far: every report is one file with a tab per confirmed day up to this one.
+  const month = useQuery({
+    queryKey: ['day-review', 'month-upto', date, reviewsFrom],
+    queryFn: () => fetchMonth(date.slice(0, 7), date, reviewsFrom),
+    enabled: Boolean(settings.data),
+  })
   const invalidate = useInvalidate()
 
   const [edits, setEdits] = useState<DayEdits>(() => loadEdits(date))
@@ -149,11 +157,21 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     )
   }
 
-  /** The Excel file for the current draft (nothing is saved here). */
-  async function makeReport(rowsForReport: DayRow[]) {
-    const [{ buildReport }, templateBytes] = await Promise.all([import('../lib/report'), downloadTemplate()])
+  /**
+   * The report file: the month so far, one tab per confirmed day, ending with
+   * this day. `rowsForReport` is the draft being reviewed (preview or confirm);
+   * null rebuilds a confirmed day from what was saved. Nothing is saved here.
+   */
+  async function makeReport(rowsForReport: DayRow[] | null) {
     const dateLabel = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-    return buildReport(templateBytes, toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel))
+    const [monthData, { buildMonthReport }, templateBytes] = await Promise.all([
+      fetchMonth(date.slice(0, 7), date, reviewsFrom),
+      import('../lib/report'),
+      downloadTemplate(),
+    ])
+    const stored = monthReportDays({ ...monthData, packages: packages.data ?? [], approvals: approvals.data ?? [] })
+    const current = rowsForReport ? toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel) : null
+    return buildMonthReport(templateBytes, monthUpTo(stored, date, current))
   }
 
   async function onPreview() {
@@ -204,12 +222,17 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   }
 
   async function onDownload() {
-    const path = review.data?.review?.report_storage_path
-    if (!path) return
+    setBusy('Building the report…')
+    setError(null)
     try {
-      downloadFile(await downloadSavedReport(path), `Daily Report ${date}.xlsx`)
+      // Rebuilt from the confirmed days, so a corrected earlier day shows corrected.
+      downloadFile(await makeReport(null), `Daily Report ${date}.xlsx`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      const path = review.data?.review?.report_storage_path
+      if (path) downloadFile(await downloadSavedReport(path), `Daily Report ${date}.xlsx`)
+      else setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -241,7 +264,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
           date={date}
           sessions={review.data!.sessions}
           confirmedAt={review.data!.review!.confirmed_at!}
-          hasReport={Boolean(review.data!.review!.report_storage_path)}
+          monthNote={<MonthTabsNote date={date} month={month.data} />}
           busy={busy}
           onDownload={onDownload}
           onReopen={onReopen}
@@ -410,6 +433,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
 
           {current === 'confirm' && (
             <>
+              <MonthTabsNote date={date} month={month.data} />
               <div className="card list day-totals">
                 {[
                   ['Clients', String(rows.length)],
@@ -461,11 +485,9 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
             onPick={go}
             nextNote={current === 'clients' && attention.length ? `${plural(attention.length, 'client')} still ${attention.length === 1 ? 'needs' : 'need'} a look` : undefined}
           />
-          {current === 'confirm' && <MonthDownload date={date} />}
         </>
       )}
 
-      {ready && confirmed && <MonthDownload date={date} />}
 
       {editing && (
         <EditRowDialog
@@ -757,11 +779,31 @@ function AddClientDialog({ onAdd, onClose }: { onAdd: (c: { id: string; name: st
   )
 }
 
+/** What the report file holds: a tab per confirmed day of the month up to this one. */
+function MonthTabsNote({ date, month }: { date: string; month?: { confirmedDates: string[]; notConfirmed: string[] } }) {
+  if (!month) return null
+  const monthName = new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { month: 'long' })
+  const before = month.confirmedDates.filter((d) => d < date).length
+  const missing = month.notConfirmed.filter((d) => d < date)
+  return (
+    <p className="muted small">
+      {before ? `The report file has ${before + 1} tabs, one for each confirmed day of ${monthName} up to this one.` : 'The report file has this day’s tab.'}
+      {missing.length > 0 && ' Not confirmed yet, so left out: '}
+      {missing.map((d, i) => (
+        <span key={d}>
+          {i ? ', ' : ''}
+          <Link to={`/day/${d}`}>{formatDate(d, { short: true })}</Link>
+        </span>
+      ))}
+    </p>
+  )
+}
+
 function ConfirmedDay({
   date,
   sessions,
   confirmedAt,
-  hasReport,
+  monthNote,
   busy,
   onDownload,
   onReopen,
@@ -769,7 +811,7 @@ function ConfirmedDay({
   date: string
   sessions: Array<{ id: string; client_name: string | null; billing_type: string; billed: number; collected: number; session_no: number | null; therapist: string | null }>
   confirmedAt: string
-  hasReport: boolean
+  monthNote: ReactNode
   busy: string | null
   onDownload: () => void
   onReopen: () => void
@@ -786,11 +828,10 @@ function ConfirmedDay({
         </div>
         <Badge tone="accent">Done</Badge>
       </div>
-      {hasReport && (
-        <button type="button" className="button primary block" onClick={onDownload}>
-          Download the report
-        </button>
-      )}
+      <button type="button" className="button primary block" disabled={Boolean(busy)} onClick={onDownload}>
+        {busy ?? 'Download the report'}
+      </button>
+      {monthNote}
       {SECTION_ORDER.map((type) => {
         const list = sessions.filter((s) => s.billing_type === type)
         if (!list.length) return null

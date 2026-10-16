@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -128,7 +128,8 @@ describe('signed in', () => {
   it('sends unknown paths to Today', async () => {
     const router = renderAt('/nope')
     await screen.findByRole('navigation', { name: 'Main' })
-    expect(router.state.location.pathname).toBe('/')
+    // The redirect can land a moment after the menu appears.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
   })
 
   it('signs out from More', async () => {

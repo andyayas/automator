@@ -1194,16 +1194,6 @@ details.card[open] > summary {
   gap: 8px;
 }
 
-.month-download {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.month-download p {
-  margin: 0;
-}
 
 .income-row {
   display: flex;
