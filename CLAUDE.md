@@ -563,6 +563,12 @@ locally before calling a phase done.
    (cash upload + live sheet), Clients (flagged first), Money (expenses,
    other income), Confirm (totals, preview, confirm). It opens on Clients when
    the data is already in.
+   **Every report is the month so far** (her decision, 2026-10-16): one file
+   with a tab per confirmed day of the month up to and including that day
+   (`monthUpTo` in `src/lib/month-report.ts`), like her old monthly workbooks.
+   Preview and Confirm use the draft for that day's tab; a confirmed day's
+   download is rebuilt from the saved days, so a corrected earlier day shows
+   corrected. There is no separate month download.
    *Done when* rebuilding the September days reproduces the old reports'
    clients and amounts, or every difference is explained.
 
