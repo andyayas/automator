@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { DateNav, LinkClientDialog, StatusChip } from '../components/schedule-ui'
+import { DateNav, LinkClientDialog } from '../components/schedule-ui'
 import { SheetRefresh } from '../components/SheetRefresh'
 import { Badge, Empty, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { updateClient } from '../lib/api'
@@ -158,28 +158,26 @@ function ReminderRow({
   return (
     <article className={`card reminder ${sent ? 'sent' : ''}`}>
       <div className="reminder-top">
-        <div className="row-text">
-          <span className="strong">{e.client && linked ? e.client.name : e.parsed_name}</span>
-          <span className="muted small">
-            {formatSlotTime(e.slot_time.slice(0, 5))} · {e.therapist}
-            {phoneDigits && linked && (
-              <>
-                {' · '}
-                <span className="nowrap">{formatPhone(phoneDigits)}</span>
-              </>
-            )}
-          </span>
-        </div>
+        <span className="strong">{e.client && linked ? e.client.name : e.parsed_name}</span>
         <div className="badges">
           {e.status === 'confirmed' ? (
             <Badge tone="accent">Already confirmed</Badge>
           ) : e.status === 'rescheduled' ? (
             <Badge tone="warn">Rescheduled</Badge>
           ) : (
-            <StatusChip status={e.status} />
+            <Badge>No reply yet</Badge>
           )}
         </div>
       </div>
+      <p className="muted small reminder-meta">
+        {formatSlotTime(e.slot_time.slice(0, 5))} · {e.therapist}
+        {phoneDigits && linked && (
+          <>
+            {' · '}
+            <span className="nowrap">{formatPhone(phoneDigits)}</span>
+          </>
+        )}
+      </p>
 
       {!linked ? (
         <div className="booking-check">

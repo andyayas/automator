@@ -26,6 +26,8 @@ import {
   useSettings,
 } from '../lib/queries'
 import { searchClients } from '../lib/search'
+import { openDialog } from '../lib/dialog'
+import { formatSlotTime } from '../lib/schedule'
 
 // Her edits are kept on this device while she works, so leaving the page loses nothing.
 const editsKey = (date: string) => `clinic-admin.day-edits.${date}`
@@ -350,7 +352,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
                         <span>{r.clientName}</span>
                         <span className="muted small">
                           {r.status === 'cancelled' ? 'Cancelled (X)' : r.status === 'rescheduled' ? 'Rescheduled (R)' : 'Removed'}
-                          {r.slotTime ? ` · ${r.slotTime}` : ''}
+                          {r.slotTime ? ` · ${formatSlotTime(r.slotTime)}` : ''}
                         </span>
                       </span>
                       <button
@@ -586,7 +588,7 @@ function RowCard({
         <span className="row-text">
           <span className="strong">{r.clientName}</span>
           <span className="muted small">
-            {[r.slotTime, r.therapist, r.status === 'walk-in' ? 'not on the schedule' : null].filter(Boolean).join(' · ')}
+            {[r.slotTime ? formatSlotTime(r.slotTime) : null, r.therapist, r.status === 'walk-in' ? 'not on the schedule' : null].filter(Boolean).join(' · ')}
           </span>
           <span className="small">
             Billed {formatMoney(r.billed)} · Collected {formatMoney(r.collected)}
@@ -663,10 +665,10 @@ function EditRowDialog({
   const [sessionNo, setSessionNo] = useState(numberText(row.sessionNo))
   const [therapist, setTherapist] = useState(row.therapist ?? '')
   const [note, setNote] = useState(row.extraNote)
-  useEffect(() => dialog.current?.showModal(), [])
+  useEffect(() => openDialog(dialog.current), [])
 
   return (
-    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label={`Edit ${row.clientName}`}>
+    <dialog ref={dialog} tabIndex={-1} className="sheet" onClose={onClose} aria-label={`Edit ${row.clientName}`}>
       <div className="sheet-head">
         <p className="strong">{row.clientName}</p>
         <button type="button" className="button ghost" onClick={onClose}>
@@ -764,17 +766,17 @@ function AddClientDialog({ onAdd, onClose }: { onAdd: (c: { id: string; name: st
   const clients = useClients()
   const dialog = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
-  useEffect(() => dialog.current?.showModal(), [])
+  useEffect(() => openDialog(dialog.current), [])
   const results = useMemo(() => searchClients(clients.data ?? [], query).results, [clients.data, query])
   return (
-    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label="Add a client to this day">
+    <dialog ref={dialog} tabIndex={-1} className="sheet" onClose={onClose} aria-label="Add a client to this day">
       <div className="sheet-head">
         <p className="strong">Add a client to this day</p>
         <button type="button" className="button ghost" onClick={onClose}>
           Close
         </button>
       </div>
-      <input className="search" type="search" placeholder="Search clients" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+      <input className="search" type="search" placeholder="Search clients" value={query} onChange={(e) => setQuery(e.target.value)} data-autofocus />
       <div className="card list sheet-list">
         {results.map((c) => (
           <button key={c.id} type="button" className="list-row link as-button" onClick={() => onAdd(c)}>

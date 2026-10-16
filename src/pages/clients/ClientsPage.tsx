@@ -136,7 +136,7 @@ function InsuranceTab({ query }: { query: string }) {
                     {a.valid_until ? ` · until ${formatDate(a.valid_until, { short: true })}` : ''}
                   </span>
                 </span>
-                <span className="badges">
+                <span className="badges stacked">
                   {days !== null && a.status === 'active' && days < 0 && <Badge tone="danger">Expired</Badge>}
                   {days !== null && a.status === 'active' && days >= 0 && days <= 7 && <Badge tone="warn">Expires soon</Badge>}
                   <StatusOrRemaining item={a} total={a.sessions_approved} />

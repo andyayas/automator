@@ -8,6 +8,7 @@ import { normalizeName } from '../../lib/names'
 import { formatPhone } from '../../lib/phone'
 import { useAliases, useApprovals, useClient, useClients, useClientSessions, useInvalidate, usePackages } from '../../lib/queries'
 import { searchClients } from '../../lib/search'
+import { openDialog } from '../../lib/dialog'
 
 const BILLING_LABEL: Record<string, string> = {
   insurance: 'Insurance',
@@ -188,7 +189,7 @@ export function ClientDetailPage() {
           <input
             value={newAlias}
             onChange={(e) => setNewAlias(e.target.value)}
-            placeholder="Another spelling, e.g. from the cash statement"
+            placeholder="Another spelling"
             aria-label="Add a name variant"
             autoCapitalize="none"
             autoComplete="off"
@@ -218,7 +219,7 @@ function MergeDialog({ keep, onClose }: { keep: { id: string; name: string }; on
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  useEffect(() => dialog.current?.showModal(), [])
+  useEffect(() => openDialog(dialog.current), [])
   const results = useMemo(
     () => searchClients((clients.data ?? []).filter((x) => x.id !== keep.id), query).results,
     [clients.data, query, keep.id],
@@ -240,7 +241,7 @@ function MergeDialog({ keep, onClose }: { keep: { id: string; name: string }; on
   }
 
   return (
-    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label={`Merge a duplicate into ${keep.name}`}>
+    <dialog ref={dialog} tabIndex={-1} className="sheet" onClose={onClose} aria-label={`Merge a duplicate into ${keep.name}`}>
       <div className="sheet-head">
         <div>
           <p className="muted small">Keep</p>
@@ -251,7 +252,7 @@ function MergeDialog({ keep, onClose }: { keep: { id: string; name: string }; on
         </button>
       </div>
       <p className="muted small">Find the other copy. Its packages, approvals, sessions, bookings, payments and spellings move here.</p>
-      <input className="search" type="search" placeholder="Search the duplicate" value={query} onChange={(e) => setQuery(e.target.value)} autoFocus />
+      <input className="search" type="search" placeholder="Search the duplicate" value={query} onChange={(e) => setQuery(e.target.value)} data-autofocus />
       {error && <p className="error" role="alert">{error}</p>}
       <div className="card list sheet-list">
         {results.map((x) => (

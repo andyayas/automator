@@ -7,6 +7,7 @@ import { useClients, useInvalidate } from '../lib/queries'
 import { linkCashName } from '../lib/day-api'
 import { linkNameToClient } from '../lib/schedule-api'
 import { searchClients } from '../lib/search'
+import { openDialog } from '../lib/dialog'
 
 const STATUS: Record<BookingStatus, { letter: string; label: string; tone: string }> = {
   confirmed: { letter: 'C', label: 'Confirmed', tone: 'accent' },
@@ -68,9 +69,7 @@ export function LinkClientDialog({
   const [error, setError] = useState<string | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
 
-  useEffect(() => {
-    dialog.current?.showModal()
-  }, [])
+  useEffect(() => openDialog(dialog.current), [])
 
   const results = useMemo(() => {
     const all = clients.data ?? []
@@ -108,7 +107,7 @@ export function LinkClientDialog({
   }
 
   return (
-    <dialog ref={dialog} className="sheet" onClose={onClose} aria-label={`Who is ${name}?`}>
+    <dialog ref={dialog} tabIndex={-1} className="sheet" onClose={onClose} aria-label={`Who is ${name}?`}>
       <div className="sheet-head">
         <div>
           <p className="muted small">On the schedule as</p>
