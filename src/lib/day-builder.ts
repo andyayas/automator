@@ -95,6 +95,8 @@ export type DayInputs = {
   clientNames: Map<string, string>
   expenseLabels: Map<string, string>
   defaults: { perSessionPrice: number; insuranceBilled: number }
+  /** A client's usual per-session price, when it isn't the default. */
+  clientPrices?: Map<string, number>
   /** Cash rows she moved to "other income" / back to a client session. */
   asIncome?: Set<string>
   asSession?: Set<string>
@@ -235,7 +237,8 @@ export function buildDayDraft(input: DayInputs): DayDraft {
         if (pk.sessions_remaining - n <= 0) row.flags.push({ kind: 'exhausted', text: 'Package has no sessions left' })
       }
     } else if (row.billingType === 'per_session') {
-      row.billed = row.collected > 0 ? row.collected : defaults.perSessionPrice
+      const usual = id ? input.clientPrices?.get(id) : undefined
+      row.billed = row.collected > 0 ? row.collected : (usual ?? defaults.perSessionPrice)
       if (row.collected <= 0) row.flags.push({ kind: 'not-paid', text: 'Came, but no payment in the cash statement' })
     } else {
       row.billed = 0

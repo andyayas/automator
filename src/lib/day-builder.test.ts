@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
-import { applyEdits, emptyEdits, toReportData } from './day-edits'
+import { applyEdits, editsFromSessions, emptyEdits, frozenEdits, sessionLabel, toReportData } from './day-edits'
 import { monthReportDays, monthUpTo } from './month-report'
 
 const base = {
@@ -225,7 +225,8 @@ describe('applyEdits and toReportData', () => {
   it('builds report sections in time order and counts unpaid packages', () => {
     const { rows } = applyEdits(draft, emptyEdits())
     const data = toReportData(rows, [{ label: 'Coffee', amount: 6 }], [], [{ ...pkg('p1', 'omar', 2), amount_paid: 100 }], '16 October 2026')
-    expect(data.sections.package.map((r) => [r.client, r.sessionNo])).toEqual([['Omar Sample', 3]])
+    // Package and insurance sessions read "3/10" on the report.
+    expect(data.sections.package.map((r) => [r.client, r.sessionNo])).toEqual([['Omar Sample', '3/10']])
     expect(data.sections.per_session.map((r) => r.client)).toEqual(['Jane Testerson'])
     expect(data.totalClients).toBe(2)
     expect(data.packageNotPaid).toBe(1)
@@ -270,7 +271,8 @@ describe('monthReportDays', () => {
       approvals: [approval('a1', 'lina', 1)],
     })
     expect(days.map((d) => d.sheetName)).toEqual(['Thu Oct 15', 'Fri Oct 16'])
-    expect(days[1].data.sections.insurance).toMatchObject([{ client: 'Lina Example', serialNumber: 'S-1', sessionNo: 2 }])
+    expect(days[1].data.sections.insurance).toMatchObject([{ client: 'Lina Example', serialNumber: 'S-1', sessionNo: '2/10' }])
+    expect(days[1].data.sections.package).toMatchObject([{ client: 'Omar Sample', sessionNo: '7/10' }])
     expect(days[1].data.expenses).toEqual([{ label: 'Water 5 boxes', amount: 12 }])
     expect(days[1].data.packageNotPaid).toBe(1)
     expect(days[0].data.totalClients).toBe(1)
@@ -340,5 +342,67 @@ describe('monthUpTo', () => {
 
   it('for a confirmed day, rebuilds the month up to and including it', () => {
     expect(monthUpTo(stored, '2026-10-09', null).map((d) => d.date)).toEqual(['2026-10-08', '2026-10-09'])
+  })
+})
+
+describe('editing a confirmed day', () => {
+  // Jane (per session, 09:00) and Omar (package of 10, 2 used, 08:00).
+  const draft = buildDayDraft(
+    inputs({
+      entries: [entry({ id: 'y1', client_id: 'jane' }), entry({ id: 'y2', client_id: 'omar', slot_time: '08:00:00' })],
+      packages: [pkg('p1', 'omar', 2)],
+    }),
+  )
+  const saved = (over: Record<string, unknown>) => ({
+    id: 's1',
+    client_id: 'jane',
+    client_name: 'Jane Testerson',
+    therapist: 'Therapist A',
+    billing_type: 'per_session',
+    package_id: null,
+    approval_id: null,
+    schedule_entry_id: 'y1',
+    session_no: null,
+    billed: 40,
+    collected: 40,
+    extra_note: null,
+    ...over,
+  })
+
+  it('freezes every row as confirmed, so reopening shows exactly that', () => {
+    const { rows } = applyEdits(draft, { ...emptyEdits(), rows: { 'entry:y2': { sessionNo: 6, sessionAnchor: true } } })
+    const frozen = frozenEdits(rows, emptyEdits())
+    const again = applyEdits(draft, frozen).rows
+    const shape = (r: (typeof rows)[number]) => [r.key, r.billingType, r.billed, r.collected, r.sessionNo]
+    expect(again.map(shape)).toEqual(rows.map(shape))
+    expect(again.find((r) => r.key === 'entry:y2')?.sessionNo).toBe(6)
+    expect(Object.values(frozen.rows).some((e) => e.sessionAnchor)).toBe(false)
+  })
+
+  it('rebuilds the edits from saved sessions for days confirmed before edits were kept', () => {
+    const edits = editsFromSessions(draft, [
+      saved({ billed: 38, collected: 30, extra_note: 'paid less' }),
+      saved({ id: 's-extra', schedule_entry_id: null, client_id: 'rami', client_name: 'Rami Testa' }),
+    ] as never)
+    const rows = applyEdits(draft, edits).rows
+    expect(rows.find((r) => r.key === 'entry:y1')).toMatchObject({ billed: 38, collected: 30, extraNote: 'paid less' })
+    expect(rows.find((r) => r.clientName === 'Rami Testa')).toBeTruthy()
+    // Omar wasn't in the confirmed day, so he comes back removed.
+    expect(rows.find((r) => r.key === 'entry:y2')).toBeUndefined()
+  })
+
+  it('writes "7/12" labels and plain numbers otherwise', () => {
+    expect(sessionLabel(7, 12)).toBe('7/12')
+    expect(sessionLabel(3, null)).toBe(3)
+    expect(sessionLabel(null, 12)).toBeNull()
+  })
+})
+
+describe('per-client price', () => {
+  it('bills a client’s usual price when nothing is paid yet, the default otherwise', () => {
+    const entries = [entry({ id: 'z1', client_id: 'jane' }), entry({ id: 'z2', client_id: 'omar' })]
+    const d = buildDayDraft(inputs({ entries, clientPrices: new Map([['jane', 40]]) }))
+    expect(d.rows.find((r) => r.clientId === 'jane')?.billed).toBe(40)
+    expect(d.rows.find((r) => r.clientId === 'omar')?.billed).toBe(45)
   })
 })

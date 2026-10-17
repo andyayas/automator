@@ -23,7 +23,7 @@ export type ApprovalInput = Omit<TablesInsert<'insurance_approvals'>, 'owner_id'
 export type DaySession = Tables<'day_sessions'>
 
 const PAGE = 1000
-const CLIENT_COLUMNS = 'id, name, phone, phone_contacts, phone_override, contacts_key, notes, active, created_at, updated_at, owner_id'
+const CLIENT_COLUMNS = 'id, name, phone, phone_contacts, phone_override, contacts_key, notes, active, per_session_price, created_at, updated_at, owner_id'
 
 function fail(error: { message: string } | null): asserts error is null {
   if (error) throw new Error(error.message)
@@ -124,6 +124,20 @@ export async function savePackage(id: string | null, input: PackageInput) {
     ? await supabase.from('packages').update(input).eq('id', id)
     : await supabase.from('packages').insert(input)
   fail(error)
+}
+
+/** Creates a package and returns its id (used from the daily review). */
+export async function createPackage(input: PackageInput): Promise<string> {
+  const { data, error } = await supabase.from('packages').insert(input).select('id').single()
+  fail(error)
+  return data.id
+}
+
+/** Creates an insurance approval and returns its id (used from the daily review). */
+export async function createApproval(input: ApprovalInput): Promise<string> {
+  const { data, error } = await supabase.from('insurance_approvals').insert(input).select('id').single()
+  fail(error)
+  return data.id
 }
 
 export async function deletePackage(id: string) {

@@ -443,6 +443,20 @@ go-live seed uses it ahead of schedule session numbers and file counts.
 - **Daily reviews start on 8 October 2026** (`settings.reviews_from`): she made
   the 1–7 October reports by hand, so earlier days aren't listed as "not
   confirmed".
+- **Per-client price** (2026-10-17): a per-session client confirmed at a price
+  other than the default keeps it (`clients.per_session_price`), and their
+  next unpaid session is billed at it. Editable on the client's edit page.
+- **Session number corrections** (2026-10-17): typing a package / insurance
+  session number in the review re-anchors it on confirm
+  (`anchorSession`: sessions already used = N − 1, counted up to the day
+  before), so the next session follows from N. Never applied before confirm.
+- **Creating from the review**: choosing Package / Insurance for a client
+  without one offers "New package…" / "New approval…" in the Edit dialog; it is
+  created active, starting at the dialog's session number.
+- **Edit this day**: confirming saves the frozen edits (`day_reviews.edits`,
+  `frozenEdits`); Edit this day reopens the day with them (older days are
+  rebuilt from their sessions, `editsFromSessions`). The report shows package
+  and insurance sessions as "7/12", data centred.
 - **Name matching**: normalize (trim, lowercase, collapse spaces, strip
   status/number/amount tokens), then exact alias → fuzzy (token-sort ratio ≥ 0.85)
   against known clients → Contacts. Every confirmed match is saved as an alias,

@@ -90,6 +90,8 @@ export function useInvalidate() {
         client.invalidateQueries({ queryKey: keys.expenseLabels }),
         client.invalidateQueries({ queryKey: keys.packages }),
         client.invalidateQueries({ queryKey: keys.approvals }),
+        // Confirming learns each per-session client's usual price.
+        client.invalidateQueries({ queryKey: keys.clients }),
       ]),
     template: () => client.invalidateQueries({ queryKey: keys.template }),
     settings: () =>

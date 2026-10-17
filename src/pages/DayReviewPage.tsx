@@ -6,10 +6,10 @@ import { DaySources } from '../components/DaySources'
 import { SheetRefresh } from '../components/SheetRefresh'
 import { StepBar, StepNav, type ReviewStep } from '../components/ReviewSteps'
 import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
-import type { ApprovalWithBalance, PackageWithBalance } from '../lib/api'
-import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, fetchMonth, reopenDay, saveReport } from '../lib/day-api'
+import { createApproval, createPackage, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
+import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, fetchMonth, dayBefore, reopenDay, saveReport, type SessionAnchor } from '../lib/day-api'
 import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type DayRow } from '../lib/day-builder'
-import { applyEdits, emptyEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
+import { applyEdits, editsFromSessions, emptyEdits, frozenEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { monthReportDays, monthUpTo } from '../lib/month-report'
 import { formatDate, formatMoney, formatTime, numberText, parseNumber, plural, todayISO } from '../lib/format'
@@ -108,6 +108,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       packages: packages.data,
       approvals: approvals.data,
       clientNames: new Map(clients.data.map((c) => [c.id, c.name])),
+      clientPrices: new Map(clients.data.filter((c) => c.per_session_price !== null).map((c) => [c.id, Number(c.per_session_price)])),
       expenseLabels: labels.data,
       defaults,
       asIncome: new Set(edits.asIncome),
@@ -173,7 +174,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       downloadTemplate(),
     ])
     const stored = monthReportDays({ ...monthData, packages: packages.data ?? [], approvals: approvals.data ?? [] })
-    const current = rowsForReport ? toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel) : null
+    const current = rowsForReport ? toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel, approvals.data ?? []) : null
     return buildMonthReport(templateBytes, monthUpTo(stored, date, current))
   }
 
@@ -195,7 +196,24 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setBusy('Saving the day…')
     setError(null)
     try {
-      await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)), draft.otherIncome)
+      // Session numbers she typed on a package / insurance row re-anchor its count.
+      const anchors = final.rows.flatMap<SessionAnchor>((r) => {
+        if (!edits.rows[r.key]?.sessionAnchor || !r.sessionNo) return []
+        if (r.billingType === 'package' && r.packageId) {
+          const p = packages.data?.find((x) => x.id === r.packageId)
+          return p ? [{ kind: 'package' as const, id: p.id, sessionNo: r.sessionNo, total: p.sessions_total }] : []
+        }
+        if (r.billingType === 'insurance' && r.approvalId) {
+          const a = approvals.data?.find((x) => x.id === r.approvalId)
+          return a ? [{ kind: 'approval' as const, id: a.id, sessionNo: r.sessionNo, total: a.sessions_approved }] : []
+        }
+        return []
+      })
+      await confirmDay(date, final.rows, draft.expenses, new Map(Object.entries(edits.labels)), draft.otherIncome, {
+        edits: frozenEdits(final.rows, edits),
+        defaultPrice: defaults.perSessionPrice,
+        anchors,
+      })
       setBusy('Filling the report…')
       const bytes = await makeReport(final.rows)
       setBusy('Saving the report…')
@@ -211,11 +229,17 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     }
   }
 
+  /** Reopens a confirmed day with everything as she confirmed it, to change one thing and confirm again. */
   async function onReopen() {
-    if (!window.confirm('Reopen this day? Its sessions stop counting against packages and approvals until you confirm it again.')) return
-    setBusy('Reopening…')
+    if (!window.confirm('Edit this day? It opens as you confirmed it; its sessions count again once you confirm it again.')) return
+    setBusy('Opening the day…')
     try {
+      const saved = review.data?.review?.edits as unknown as DayEdits | null
+      const restored = saved ? { ...emptyEdits(), ...saved } : draft ? editsFromSessions(draft, review.data?.sessions ?? []) : emptyEdits()
       await reopenDay(date)
+      storeEdits(date, restored)
+      setEdits(restored)
+      setStep('clients')
       await invalidate.day()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -315,7 +339,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
                       onEdit={() => setEditing(r)}
                       onLink={() => setLinking(r)}
                       onFree={() => editRow(r.key, { billingType: 'free', billed: 0 })}
-                      onCame={() => editRow(r.key, {})}
+                      onConfirm={r.clientId ? () => editRow(r.key, {}) : undefined}
                       onRemove={() => update((e) => ({ ...e, removed: [...e.removed, r.key] }))}
                       onIncome={r.status === 'walk-in' && r.cashIds.length ? () => moveCash(r.cashIds, 'income') : undefined}
                     />
@@ -503,6 +527,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       {editing && (
         <EditRowDialog
           row={editing}
+          date={date}
+          defaults={defaults}
           packages={(packages.data ?? []).filter((p) => p.client_id === editing.clientId && p.status === 'active')}
           approvals={(approvals.data ?? []).filter((a) => a.client_id === editing.clientId && a.status === 'active')}
           onSave={(change) => {
@@ -569,7 +595,7 @@ function RowCard({
   onEdit,
   onLink,
   onFree,
-  onCame,
+  onConfirm,
   onRemove,
   onIncome,
 }: {
@@ -577,7 +603,8 @@ function RowCard({
   onEdit: () => void
   onLink?: () => void
   onFree?: () => void
-  onCame?: () => void
+  /** Accept the row as it is (it came, the amounts are right). */
+  onConfirm?: () => void
   onRemove?: () => void
   onIncome?: () => void
 }) {
@@ -621,9 +648,9 @@ function RowCard({
                 Mark as Free
               </button>
             )}
-            {kinds.has('no-status') && onCame && (
-              <button type="button" className="button small-button" onClick={onCame}>
-                Came
+            {onConfirm && !kinds.has('unmatched') && (
+              <button type="button" className="button small-button primary" onClick={onConfirm}>
+                Confirm
               </button>
             )}
             {(kinds.has('no-status') || kinds.has('not-paid')) && onRemove && (
@@ -641,8 +668,12 @@ function RowCard({
   )
 }
 
+const NEW = '__new'
+
 function EditRowDialog({
   row,
+  date,
+  defaults,
   packages,
   approvals,
   onSave,
@@ -650,6 +681,8 @@ function EditRowDialog({
   onClose,
 }: {
   row: DayRow
+  date: string
+  defaults: { perSessionPrice: number; insuranceBilled: number }
   packages: PackageWithBalance[]
   approvals: ApprovalWithBalance[]
   onSave: (change: RowEdit) => void
@@ -657,15 +690,96 @@ function EditRowDialog({
   onClose: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  const invalidate = useInvalidate()
   const [billing, setBilling] = useState<BillingType>(row.billingType)
-  const [packageId, setPackageId] = useState(row.packageId ?? packages[0]?.id ?? '')
-  const [approvalId, setApprovalId] = useState(row.approvalId ?? approvals[0]?.id ?? '')
+  // No package / approval yet: the "new" option, with its own fields.
+  const [packageId, setPackageId] = useState(row.packageId ?? packages[0]?.id ?? NEW)
+  const [approvalId, setApprovalId] = useState(row.approvalId ?? approvals[0]?.id ?? NEW)
   const [billed, setBilled] = useState(numberText(row.billed))
   const [collected, setCollected] = useState(numberText(row.collected))
   const [sessionNo, setSessionNo] = useState(numberText(row.sessionNo))
   const [therapist, setTherapist] = useState(row.therapist ?? '')
   const [note, setNote] = useState(row.extraNote)
+  const [pkg, setPkg] = useState({ sessions: '', price: '' })
+  const [appr, setAppr] = useState({ insurer: '', serial: '', sessions: '', billed: numberText(defaults.insuranceBilled), copay: '' })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   useEffect(() => openDialog(dialog.current), [])
+
+  const creatingPackage = billing === 'package' && packageId === NEW
+  const creatingApproval = billing === 'insurance' && approvalId === NEW
+  const pkgPer = (() => {
+    const n = parseNumber(pkg.sessions)
+    const total = parseNumber(pkg.price)
+    return n && total ? Math.round(total / n) : null
+  })()
+
+  async function submit() {
+    setError(null)
+    const n = parseNumber(sessionNo)
+    const common = {
+      collected: parseNumber(collected) ?? 0,
+      therapist: therapist.trim() || null,
+      extraNote: note,
+    }
+    if ((creatingPackage || creatingApproval) && !row.clientId) return setError('Link this name to a client first (Who is this?).')
+    // The day's session is session n of the new package / approval.
+    const first = n && n > 0 ? n : 1
+    const anchor = { sessions_used_before_app: first - 1, used_before_app_as_of: dayBefore(date), status: 'active' as const }
+    try {
+      if (creatingPackage) {
+        const sessions = parseNumber(pkg.sessions)
+        const price = parseNumber(pkg.price)
+        if (!sessions || !price) return setError('Enter the package’s sessions and price.')
+        if (first > sessions) return setError(`Session ${first} is more than the package’s ${sessions} sessions.`)
+        setBusy(true)
+        const id = await createPackage({
+          client_id: row.clientId!,
+          sessions_total: sessions,
+          price_total: price,
+          per_session: Math.round(price / sessions),
+          purchased_on: date,
+          ...anchor,
+        })
+        await invalidate.balances()
+        return onSave({ ...common, billingType: 'package', packageId: id, approvalId: null, sessionNo: first, billed: Math.round(price / sessions) })
+      }
+      if (creatingApproval) {
+        const sessions = parseNumber(appr.sessions)
+        const perSession = parseNumber(appr.billed) ?? defaults.insuranceBilled
+        if (!appr.insurer.trim() || !sessions) return setError('Enter the insurer and the sessions approved.')
+        if (first > sessions) return setError(`Session ${first} is more than the ${sessions} approved.`)
+        setBusy(true)
+        const id = await createApproval({
+          client_id: row.clientId!,
+          insurer: appr.insurer.trim(),
+          serial_number: appr.serial.trim() || null,
+          sessions_approved: sessions,
+          billed_per_session: perSession,
+          copay_per_session: parseNumber(appr.copay) ?? 0,
+          approved_on: date,
+          ...anchor,
+        })
+        await invalidate.balances()
+        return onSave({ ...common, billingType: 'insurance', approvalId: id, packageId: null, sessionNo: first, billed: perSession })
+      }
+      const counted = billing === 'package' || billing === 'insurance'
+      onSave({
+        ...common,
+        billingType: billing,
+        packageId: billing === 'package' ? packageId || null : null,
+        approvalId: billing === 'insurance' ? approvalId || null : null,
+        billed: parseNumber(billed) ?? 0,
+        sessionNo: n,
+        // A session number she typed re-anchors the package / approval on confirm
+        // (kept if she edits the row again for something else).
+        ...(counted && n !== null && n !== row.sessionNo ? { sessionAnchor: true } : {}),
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+      setBusy(false)
+    }
+  }
 
   return (
     <dialog ref={dialog} tabIndex={-1} className="sheet" onClose={onClose} aria-label={`Edit ${row.clientName}`}>
@@ -679,16 +793,7 @@ function EditRowDialog({
         className="form"
         onSubmit={(e) => {
           e.preventDefault()
-          onSave({
-            billingType: billing,
-            packageId: billing === 'package' ? packageId || null : null,
-            approvalId: billing === 'insurance' ? approvalId || null : null,
-            billed: parseNumber(billed) ?? 0,
-            collected: parseNumber(collected) ?? 0,
-            sessionNo: parseNumber(sessionNo),
-            therapist: therapist.trim() || null,
-            extraNote: note,
-          })
+          void submit()
         }}
       >
         <label className="field">
@@ -705,33 +810,80 @@ function EditRowDialog({
           <label className="field">
             <span>Package</span>
             <select value={packageId} onChange={(e) => setPackageId(e.target.value)}>
-              {!packages.length && <option value="">No active package</option>}
               {packages.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.sessions_total} sessions · {p.sessions_remaining} left
                 </option>
               ))}
+              <option value={NEW}>New package…</option>
             </select>
           </label>
+        )}
+        {creatingPackage && (
+          <div className="card new-plan">
+            <p className="small strong">New package for {row.clientName}</p>
+            <div className="field-row">
+              <label className="field">
+                <span>Sessions</span>
+                <input inputMode="numeric" value={pkg.sessions} onChange={(e) => setPkg({ ...pkg, sessions: e.target.value })} placeholder="12" />
+              </label>
+              <label className="field">
+                <span>Price ($)</span>
+                <input inputMode="decimal" value={pkg.price} onChange={(e) => setPkg({ ...pkg, price: e.target.value })} placeholder="450" />
+              </label>
+            </div>
+            {pkgPer !== null && <p className="muted small">{formatMoney(pkgPer)} per session.</p>}
+          </div>
         )}
         {billing === 'insurance' && (
           <label className="field">
             <span>Approval</span>
             <select value={approvalId} onChange={(e) => setApprovalId(e.target.value)}>
-              {!approvals.length && <option value="">No active approval</option>}
               {approvals.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.insurer} · {a.sessions_remaining} left
                 </option>
               ))}
+              <option value={NEW}>New approval…</option>
             </select>
           </label>
         )}
+        {creatingApproval && (
+          <div className="card new-plan">
+            <p className="small strong">New approval for {row.clientName}</p>
+            <div className="field-row">
+              <label className="field">
+                <span>Insurer</span>
+                <input value={appr.insurer} onChange={(e) => setAppr({ ...appr, insurer: e.target.value })} />
+              </label>
+              <label className="field">
+                <span>Serial number</span>
+                <input value={appr.serial} onChange={(e) => setAppr({ ...appr, serial: e.target.value })} />
+              </label>
+            </div>
+            <div className="field-row">
+              <label className="field">
+                <span>Sessions approved</span>
+                <input inputMode="numeric" value={appr.sessions} onChange={(e) => setAppr({ ...appr, sessions: e.target.value })} />
+              </label>
+              <label className="field">
+                <span>Billed per session ($)</span>
+                <input inputMode="decimal" value={appr.billed} onChange={(e) => setAppr({ ...appr, billed: e.target.value })} />
+              </label>
+            </div>
+            <label className="field">
+              <span>Client co-pay ($)</span>
+              <input inputMode="decimal" value={appr.copay} onChange={(e) => setAppr({ ...appr, copay: e.target.value })} placeholder="0" />
+            </label>
+          </div>
+        )}
         <div className="field-row">
-          <label className="field">
-            <span>Billed ($)</span>
-            <input inputMode="decimal" value={billed} onChange={(e) => setBilled(e.target.value)} />
-          </label>
+          {!(creatingPackage || creatingApproval) && (
+            <label className="field">
+              <span>Billed ($)</span>
+              <input inputMode="decimal" value={billed} onChange={(e) => setBilled(e.target.value)} />
+            </label>
+          )}
           <label className="field">
             <span>Collected ($)</span>
             <input inputMode="decimal" value={collected} onChange={(e) => setCollected(e.target.value)} />
@@ -739,20 +891,28 @@ function EditRowDialog({
         </div>
         <div className="field-row">
           <label className="field">
-            <span>Session no.</span>
-            <input inputMode="numeric" value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} />
+            <span>{creatingPackage || creatingApproval ? 'This is session no.' : 'Session no.'}</span>
+            <input inputMode="numeric" value={sessionNo} onChange={(e) => setSessionNo(e.target.value)} placeholder={creatingPackage || creatingApproval ? '1' : ''} />
           </label>
           <label className="field">
             <span>Therapist</span>
             <input value={therapist} onChange={(e) => setTherapist(e.target.value)} />
           </label>
         </div>
+        {(billing === 'package' || billing === 'insurance') && !(creatingPackage || creatingApproval) && (
+          <p className="muted small">Changing the session no. makes the next sessions count on from it, once you confirm the day.</p>
+        )}
         <label className="field">
           <span>Extra note</span>
           <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <button type="submit" className="button primary block">
-          Save
+        {error && (
+          <p className="error small" role="alert">
+            {error}
+          </p>
+        )}
+        <button type="submit" className="button primary block" disabled={busy}>
+          {busy ? 'Saving…' : creatingPackage ? 'Create the package and save' : creatingApproval ? 'Create the approval and save' : 'Save'}
         </button>
         <button type="button" className="button ghost danger block" onClick={onRemove}>
           Remove from this day
@@ -870,7 +1030,7 @@ function ConfirmedDay({
         )
       })}
       <button type="button" className="button ghost block" disabled={Boolean(busy)} onClick={onReopen}>
-        {busy ?? 'Reopen this day to change it'}
+        {busy ?? 'Edit this day'}
       </button>
     </>
   )

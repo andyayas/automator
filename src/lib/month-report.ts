@@ -3,6 +3,7 @@
 
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { expenseKey, OTHER_INCOME } from './day-builder'
+import { sessionLabel } from './day-edits'
 import { displayName } from './names'
 import type { ReportData, ReportRow } from './report'
 import type { Tables } from './database.types'
@@ -40,6 +41,8 @@ export function monthReportDays(input: {
   approvals: ApprovalWithBalance[]
 }): Array<{ date: string; sheetName: string; data: ReportData }> {
   const serials = new Map(input.approvals.map((a) => [a.id, a.serial_number]))
+  const totalsPkg = new Map(input.packages.map((p) => [p.id, p.sessions_total]))
+  const totalsApp = new Map(input.approvals.map((a) => [a.id, a.sessions_approved]))
   const unpaid = new Set(input.packages.filter((p) => p.amount_paid !== null && Number(p.amount_paid) < Number(p.price_total)).map((p) => p.id))
 
   return [...input.confirmedDates].sort().map((date) => {
@@ -49,7 +52,14 @@ export function monthReportDays(input: {
       therapist: s.therapist ?? '',
       billed: Number(s.billed),
       collected: Number(s.collected),
-      sessionNo: s.session_no,
+      sessionNo: sessionLabel(
+        s.session_no,
+        s.billing_type === 'package'
+          ? totalsPkg.get(s.package_id ?? '')
+          : s.billing_type === 'insurance'
+            ? totalsApp.get(s.approval_id ?? '')
+            : null,
+      ),
       serialNumber: s.approval_id ? (serials.get(s.approval_id) ?? null) : null,
       note: s.extra_note ?? '',
     })

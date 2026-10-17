@@ -3,6 +3,8 @@
 
 import type { Tables } from './database.types'
 import type { DayRow, ExpenseLine } from './day-builder'
+import type { DayEdits } from './day-edits'
+import type { Json } from './database.types'
 import builtInTemplateUrl from '../assets/daily-report-template.xlsx?url'
 import { monthRange } from './month-report'
 import { supabase } from './supabase'
@@ -65,10 +67,34 @@ export async function fetchRecentReviews(dates: string[]): Promise<DayReview[]> 
   return data
 }
 
+/** A package or approval she re-numbered in the review: this day's session is `sessionNo`. */
+export type SessionAnchor = { kind: 'package' | 'approval'; id: string; sessionNo: number; total: number }
+
+/** The day before "2026-10-02" is "2026-10-01". */
+export function dayBefore(date: string): string {
+  const d = new Date(`${date}T00:00:00`)
+  d.setDate(d.getDate() - 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * Re-anchors a package / approval so the session on `date` is `sessionNo`:
+ * "sessions already used" becomes sessionNo − 1, counted up to the day before.
+ * The day's own confirmed session then makes it sessionNo, and the next one follows.
+ */
+export async function anchorSession(date: string, a: SessionAnchor) {
+  const used = Math.min(Math.max(a.sessionNo - 1, 0), a.total)
+  const table = a.kind === 'package' ? 'packages' : 'insurance_approvals'
+  const { error } = await supabase.from(table).update({ sessions_used_before_app: used, used_before_app_as_of: dayBefore(date) }).eq('id', a.id)
+  fail(error)
+}
+
 /**
  * Confirms the day: replaces its sessions with the reviewed rows (confirmed),
- * which is what deducts them from packages and approvals, and learns any
- * expense labels she corrected.
+ * which is what deducts them from packages and approvals; applies the session
+ * numbers she corrected; learns each per-session client's usual price and any
+ * expense labels she corrected; and keeps her edits so the day can be edited
+ * again later.
  */
 export async function confirmDay(
   date: string,
@@ -76,7 +102,9 @@ export async function confirmDay(
   expenses: ExpenseLine[],
   editedLabels: Map<string, string>,
   otherIncome: ExpenseLine[] = [],
+  extra: { edits?: DayEdits; defaultPrice?: number; anchors?: SessionAnchor[] } = {},
 ) {
+  for (const a of extra.anchors ?? []) await anchorSession(date, a)
   const { error: delError } = await supabase.from('day_sessions').delete().eq('date', date)
   fail(delError)
   if (rows.length) {
@@ -110,10 +138,24 @@ export async function confirmDay(
         // What she confirmed besides the sessions, with her labels (for the month file).
         expenses: expenses.map((e) => ({ label: editedLabels.get(e.cashId) ?? e.label, amount: e.amount })),
         other_income: otherIncome.map((e) => ({ label: editedLabels.get(e.cashId) ?? e.label, amount: e.amount })),
+        edits: (extra.edits ?? null) as unknown as Json,
       },
       { onConflict: 'owner_id,date' },
     )
   fail(reviewError)
+
+  // A per-session client charged other than the default keeps that price for next time.
+  if (extra.defaultPrice !== undefined) {
+    const prices = new Map<string, number | null>()
+    for (const r of rows) {
+      if (r.billingType !== 'per_session' || !r.clientId || !(r.billed > 0)) continue
+      prices.set(r.clientId, r.billed === extra.defaultPrice ? null : r.billed)
+    }
+    for (const [id, price] of prices) {
+      const { error } = await supabase.from('clients').update({ per_session_price: price }).eq('id', id)
+      fail(error)
+    }
+  }
 
   const learned = [...expenses, ...otherIncome]
     .filter((e) => editedLabels.has(e.cashId))

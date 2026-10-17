@@ -13,7 +13,8 @@ export type ReportRow = {
   therapist: string
   billed: number
   collected: number
-  sessionNo: number | null
+  /** "7/12" for package and insurance sessions. */
+  sessionNo: string | number | null
   serialNumber: string | null
   note: string
 }
@@ -161,9 +162,11 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     if (from !== to) ws.mergeCells(`${from}${row}:${to}${row}`)
   }
   const isNumber = (field: keyof ReportRow | null) => field === 'billed' || field === 'collected' || field === 'sessionNo'
-  // Session numbers are counts, not money: same look as the amount cells, plain number format.
-  const countStyle: Style = { ...s.num, numFmt: '0' }
-  const cellStyle = (field: keyof ReportRow | null) => (field === 'sessionNo' ? countStyle : isNumber(field) ? s.num : s.text)
+  // Her choice: all data cells centred horizontally (headers keep the template's alignment).
+  const centred = (st: Style): Style => ({ ...st, alignment: { ...(st.alignment ?? {}), horizontal: 'center' } })
+  // Session numbers ("7/12") are counts, not money: same look as the amount cells, plain format.
+  const countStyle: Style = centred({ ...s.num, numFmt: '@' })
+  const cellStyle = (field: keyof ReportRow | null) => (field === 'sessionNo' ? countStyle : centred(isNumber(field) ? s.num : s.text))
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
   const totals: Partial<Record<BillingType, { billed: string; collected: string; billedValue: number; collectedValue: number }>> = {}
@@ -208,8 +211,8 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`C${r}`, 'Amount', s.expHeaderNum)
   const expRows = data.expenses.length ? data.expenses : [{ label: '', amount: null as unknown as number }]
   expRows.forEach((e, i) => {
-    span('A', 'B', top + 1 + i, e.label || null, s.expText)
-    put(`C${top + 1 + i}`, e.amount ?? null, s.expNum)
+    span('A', 'B', top + 1 + i, e.label || null, centred(s.expText))
+    put(`C${top + 1 + i}`, e.amount ?? null, centred(s.expNum))
   })
 
   const ref = (k: BillingType, f: 'billed' | 'collected') => totals[k]?.[f]
@@ -247,8 +250,8 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`C${otherTop}`, 'Amount', s.expHeaderNum)
   const otherRows = data.otherIncome.length ? data.otherIncome : [{ label: '', amount: null as unknown as number }]
   otherRows.forEach((e, i) => {
-    span('A', 'B', otherTop + 1 + i, e.label || null, s.expText)
-    put(`C${otherTop + 1 + i}`, e.amount ?? null, s.expNum)
+    span('A', 'B', otherTop + 1 + i, e.label || null, centred(s.expText))
+    put(`C${otherTop + 1 + i}`, e.amount ?? null, centred(s.expNum))
   })
   const otherTotalRow = otherTop + 1 + otherRows.length
   const totalOther = sum(data.otherIncome.map((e) => e.amount))

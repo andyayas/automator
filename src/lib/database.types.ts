@@ -139,6 +139,7 @@ export type Database = {
           name: string
           notes: string | null
           owner_id: string
+          per_session_price: number | null
           phone: string | null
           phone_contacts: string | null
           phone_override: string | null
@@ -152,6 +153,7 @@ export type Database = {
           name: string
           notes?: string | null
           owner_id?: string
+          per_session_price?: number | null
           phone?: string | null
           phone_contacts?: string | null
           phone_override?: string | null
@@ -165,6 +167,7 @@ export type Database = {
           name?: string
           notes?: string | null
           owner_id?: string
+          per_session_price?: number | null
           phone?: string | null
           phone_contacts?: string | null
           phone_override?: string | null
@@ -177,6 +180,7 @@ export type Database = {
           confirmed_at: string | null
           created_at: string
           date: string
+          edits: Json | null
           expenses: Json | null
           id: string
           notes: string | null
@@ -190,6 +194,7 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string
           date: string
+          edits?: Json | null
           expenses?: Json | null
           id?: string
           notes?: string | null
@@ -203,6 +208,7 @@ export type Database = {
           confirmed_at?: string | null
           created_at?: string
           date?: string
+          edits?: Json | null
           expenses?: Json | null
           id?: string
           notes?: string | null

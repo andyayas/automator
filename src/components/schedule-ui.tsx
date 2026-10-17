@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BookingStatus } from '../lib/schedule-cell'
 import { createClientRecord } from '../lib/api'
-import { formatPhone } from '../lib/phone'
+import { formatPhone, normalizePhone } from '../lib/phone'
 import { displayName, normalizeName } from '../lib/names'
 import { useClients, useInvalidate } from '../lib/queries'
 import { linkCashName } from '../lib/day-api'
@@ -93,11 +93,21 @@ export function LinkClientDialog({
     }
   }
 
+  const [newName, setNewName] = useState(displayName(name))
+  const [newPhone, setNewPhone] = useState('')
+
   async function addNew() {
+    const phone = newPhone.trim() ? normalizePhone(newPhone) : null
+    if (newPhone.trim() && !phone) return setError('That phone number doesn’t look right.')
+    if (!newName.trim()) return setError('Enter a name.')
     setBusy(true)
     setError(null)
     try {
-      const created = await createClientRecord({ name: displayName(name), notes: 'Added from the schedule. Phone unknown.' })
+      const created = await createClientRecord({
+        name: newName.trim(),
+        phone_override: phone,
+        notes: phone ? 'Added from the schedule.' : 'Added from the schedule. Phone unknown.',
+      })
       await invalidate.clients()
       await link(created.id)
     } catch (err) {
@@ -141,9 +151,26 @@ export function LinkClientDialog({
         ))}
         {!results.length && <p className="empty pad">No client found.</p>}
       </div>
-      <button type="button" className="button block" disabled={busy} onClick={addNew}>
-        Not in the list: add “{displayName(name)}” as a new client
-      </button>
+      <form
+        className="card form new-client"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void addNew()
+        }}
+      >
+        <p className="small strong">Not in the list? Add a new client</p>
+        <label className="field">
+          <span>Name</span>
+          <input value={newName} onChange={(e) => setNewName(e.target.value)} autoComplete="off" />
+        </label>
+        <label className="field">
+          <span>Phone (optional)</span>
+          <input type="tel" inputMode="tel" value={newPhone} onChange={(e) => setNewPhone(e.target.value)} placeholder="e.g. 71 123 456" autoComplete="off" />
+        </label>
+        <button type="submit" className="button block" disabled={busy}>
+          Add as a new client
+        </button>
+      </form>
       <p className="muted small">The app remembers this spelling, so you only do this once per name.</p>
     </dialog>
   )

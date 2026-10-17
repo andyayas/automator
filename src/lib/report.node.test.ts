@@ -40,7 +40,7 @@ const row = (client: string, over: Partial<ReportRow> = {}): ReportRow => ({
 const data: ReportData = {
   dateLabel: '16 October 2026',
   sections: {
-    insurance: [row('Jane Testerson', { sessionNo: 3, serialNumber: 'S-1', collected: 5 }), row('Lina Example', { sessionNo: 1 })],
+    insurance: [row('Jane Testerson', { sessionNo: '3/10', serialNumber: 'S-1', collected: 5 }), row('Lina Example', { sessionNo: 1 })],
     package: [row('Omar Sample', { billed: 38, sessionNo: 9 })],
     per_session: Array.from({ length: 14 }, (_, i) => row(`Client ${i + 1}`, { billed: 45, collected: 45 })),
     free: [],
@@ -83,6 +83,9 @@ describe('buildReport', () => {
     expect(ws.getRow(7).values).toEqual([undefined, 'Client', 'Therapist', 'Billed', 'Collected', 'Session No.', 'Serial Number', 'Extra Note'])
     expect(ws.getCell('A8').value).toBe('Jane Testerson')
     expect(ws.getCell('F8').value).toBe('S-1')
+    expect(ws.getCell('E8').value).toBe('3/10')
+    // Her choice: data centred horizontally.
+    for (const addr of ['A8', 'C8', 'E8', 'F8']) expect(ws.getCell(addr).alignment?.horizontal).toBe('center')
     expect(ws.getCell('A10').value).toBe('Insurance total')
     expect((ws.getCell('C10').value as { formula: string }).formula).toBe('SUM(C8:C9)')
 

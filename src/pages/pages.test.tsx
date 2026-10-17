@@ -37,6 +37,7 @@ function client(c: { id: string; name: string; phone: string | null }): Client {
     contacts_key: c.name.toLowerCase(),
     notes: null,
     active: true,
+    per_session_price: null,
     created_at: '',
     updated_at: '',
   }
