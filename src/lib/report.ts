@@ -105,14 +105,16 @@ export async function buildMonthReport(
 }
 
 /**
- * Serial numbers like "12345" are text (they can start with 0 or mix letters),
- * which Excel flags with a green corner. Marks every sheet to ignore that
- * warning (ExcelJS can't write it, so it is added to the sheet XML).
+ * Serial numbers like "12345" are text (they can start with 0 or mix letters)
+ * and session labels like "7/12" look like dates: Excel flags both with a
+ * green corner. Marks every sheet to ignore those warnings (ExcelJS can't
+ * write them, so they are added to the sheet XML).
  */
 async function quietNumbersAsText(bytes: Uint8Array): Promise<Uint8Array> {
   const { default: JSZip } = await import('jszip')
   const zip = await JSZip.loadAsync(bytes)
-  const ignore = '<ignoredErrors><ignoredError sqref="A1:Z1000" numberStoredAsText="1"/></ignoredErrors>'
+  // Also "text date with 2-digit year": Excel reads session labels like "7/12" as dates.
+  const ignore = '<ignoredErrors><ignoredError sqref="A1:Z1000" numberStoredAsText="1" twoDigitTextYear="1"/></ignoredErrors>'
   // Where it goes in the sheet XML: before these, in the order the format requires.
   const after = ['<smartTags', '<drawing', '<legacyDrawing', '<legacyDrawingHF', '<picture', '<oleObjects', '<controls', '<webPublishItems', '<tableParts', '<extLst', '</worksheet>']
   for (const name of Object.keys(zip.files).filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {

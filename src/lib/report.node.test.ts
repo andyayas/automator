@@ -144,6 +144,7 @@ describe('with the clinic’s built-in template', () => {
     const zip = await JSZip.loadAsync(out)
     const sheet = await zip.file(Object.keys(zip.files).find((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))!)!.async('string')
     expect(sheet).toContain('numberStoredAsText="1"')
+    expect(sheet).toContain('twoDigitTextYear="1"')
     // It must come before the logo's drawing, or Excel would call the file damaged.
     if (sheet.includes('<drawing')) expect(sheet.indexOf('<ignoredErrors')).toBeLessThan(sheet.indexOf('<drawing'))
   })
