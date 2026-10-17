@@ -31,7 +31,8 @@ export type ReportData = {
 type Style = Partial<ExcelJS.Style>
 const FIRST_LAYOUT_ROW = 6
 const COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const
-const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 20, G: 30 }
+// F holds the summary labels ("Total Insurance Not Paid") as well as serial numbers.
+const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 28, G: 30 }
 
 /** Each section's columns: [header, field, from column, to column]. */
 type Col = [string, keyof ReportRow | null, string, string]
