@@ -32,7 +32,7 @@ type Style = Partial<ExcelJS.Style>
 const FIRST_LAYOUT_ROW = 6
 const COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const
 // F holds the summary labels ("Total Insurance Not Paid") as well as serial numbers.
-const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 21, G: 30 }
+const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 23, G: 30 }
 
 /**
  * Opens as a big window (the template saves a small one, about 1100×550 px) on
