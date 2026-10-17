@@ -32,7 +32,15 @@ type Style = Partial<ExcelJS.Style>
 const FIRST_LAYOUT_ROW = 6
 const COLUMNS = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const
 // F holds the summary labels ("Total Insurance Not Paid") as well as serial numbers.
-const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 28, G: 30 }
+const WIDTHS = { A: 26, B: 16, C: 11, D: 11, E: 12, F: 26, G: 30 }
+
+/**
+ * Opens as a big window (the template saves a small one, about 1100×550 px) on
+ * `activeTab`. Sizes are in twips (1/20 pt); Excel shrinks it to fit the screen.
+ */
+function openLarge(wb: ExcelJS.Workbook, activeTab: number) {
+  wb.views = [{ x: 0, y: 0, width: 28800, height: 18000, firstSheet: 0, activeTab, visibility: 'visible' }]
+}
 
 /** Each section's columns: [header, field, from column, to column]. */
 type Col = [string, keyof ReportRow | null, string, string]
@@ -75,6 +83,7 @@ export async function buildReport(template: ArrayBuffer | Uint8Array, data: Repo
   const ws = wb.getWorksheet('Daily Report') ?? wb.worksheets[0]
   if (!ws) throw new Error('The template has no sheet.')
   fillReportSheet(ws, data)
+  openLarge(wb, 0)
   // Excel recalculates on open (the cached results are for previews).
   wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
   return quietNumbersAsText(new Uint8Array(await wb.xlsx.writeBuffer()))
@@ -101,6 +110,8 @@ export async function buildMonthReport(
     fillReportSheet(ws, day.data)
   }
   wb.removeWorksheet(tpl.id)
+  // Opens on the last tab: the day she just confirmed or downloaded.
+  openLarge(wb, days.length - 1)
   wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
   return quietNumbersAsText(new Uint8Array(await wb.xlsx.writeBuffer()))
 }
