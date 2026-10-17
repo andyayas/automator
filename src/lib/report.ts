@@ -190,7 +190,7 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     if (from !== to) ws.mergeCells(`${from}${row}:${to}${row}`)
   }
   const isNumber = (field: keyof ReportRow | null) => field === 'billed' || field === 'collected' || field === 'sessionNo'
-  // Her choice: all data cells centred horizontally (headers keep the template's alignment).
+  // Her choice: all data cells and totals centred horizontally (headers keep the template's alignment).
   const centred = (st: Style): Style => ({ ...st, alignment: { ...(st.alignment ?? {}), horizontal: 'center' } })
   // Session numbers ("7/12") are counts, not money: same look as the amount cells, plain format.
   const countStyle: Style = centred({ ...s.num, numFmt: '@' })
@@ -224,8 +224,8 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
       put(`B${r}`, null, s.totalLabel)
       const billedValue = sum(rows.map((x) => x.billed))
       const collectedValue = sum(rows.map((x) => x.collected))
-      put(`C${r}`, { formula: `SUM(C${first}:C${last})`, result: billedValue }, s.totalNum)
-      put(`D${r}`, { formula: `SUM(D${first}:D${last})`, result: collectedValue }, s.totalNum)
+      put(`C${r}`, { formula: `SUM(C${first}:C${last})`, result: billedValue }, centred(s.totalNum))
+      put(`D${r}`, { formula: `SUM(D${first}:D${last})`, result: collectedValue }, centred(s.totalNum))
       for (const c of ['E', 'F', 'G']) put(`${c}${r}`, null, s.totalLabel)
       totals[type] = { billed: `C${r}`, collected: `D${r}`, billedValue, collectedValue }
       r++
@@ -270,7 +270,7 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
 
   const expTotal = top + 1 + expRows.length
   span('A', 'B', expTotal, 'Total Expenses', s.expTotal)
-  put(`C${expTotal}`, f(`SUM(C${top + 1}:C${expTotal - 1})`, totalExpenses), s.expTotalNum)
+  put(`C${expTotal}`, f(`SUM(C${top + 1}:C${expTotal - 1})`, totalExpenses), centred(s.expTotalNum))
 
   // Other income (left, under the expenses), in the same style.
   const otherTop = expTotal + 2
@@ -284,7 +284,7 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   const otherTotalRow = otherTop + 1 + otherRows.length
   const totalOther = sum(data.otherIncome.map((e) => e.amount))
   span('A', 'B', otherTotalRow, 'Total Other Income', s.expTotal)
-  put(`C${otherTotalRow}`, f(`SUM(C${otherTop + 1}:C${otherTotalRow - 1})`, totalOther), s.expTotalNum)
+  put(`C${otherTotalRow}`, f(`SUM(C${otherTop + 1}:C${otherTotalRow - 1})`, totalOther), centred(s.expTotalNum))
 
   const incomeTop = top + summary.length + 1
   span('F', 'G', incomeTop, 'Income / Expenses', s.incomeHeader)

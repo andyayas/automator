@@ -86,6 +86,8 @@ describe('buildReport', () => {
     expect(ws.getCell('E8').value).toBe('3/10')
     // Her choice: data centred horizontally.
     for (const addr of ['A8', 'C8', 'E8', 'F8']) expect(ws.getCell(addr).alignment?.horizontal).toBe('center')
+    // Section totals too (row 10: the insurance total).
+    for (const addr of ['C10', 'D10']) expect(ws.getCell(addr).alignment?.horizontal).toBe('center')
     expect(ws.getCell('A10').value).toBe('Insurance total')
     expect((ws.getCell('C10').value as { formula: string }).formula).toBe('SUM(C8:C9)')
 
