@@ -76,7 +76,7 @@ export async function buildReport(template: ArrayBuffer | Uint8Array, data: Repo
   fillReportSheet(ws, data)
   // Excel recalculates on open (the cached results are for previews).
   wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
-  return new Uint8Array(await wb.xlsx.writeBuffer())
+  return quietNumbersAsText(new Uint8Array(await wb.xlsx.writeBuffer()))
 }
 
 /**
@@ -101,7 +101,33 @@ export async function buildMonthReport(
   }
   wb.removeWorksheet(tpl.id)
   wb.calcProperties = { ...wb.calcProperties, fullCalcOnLoad: true }
-  return new Uint8Array(await wb.xlsx.writeBuffer())
+  return quietNumbersAsText(new Uint8Array(await wb.xlsx.writeBuffer()))
+}
+
+/**
+ * Serial numbers like "12345" are text (they can start with 0 or mix letters),
+ * which Excel flags with a green corner. Marks every sheet to ignore that
+ * warning (ExcelJS can't write it, so it is added to the sheet XML).
+ */
+async function quietNumbersAsText(bytes: Uint8Array): Promise<Uint8Array> {
+  const { default: JSZip } = await import('jszip')
+  const zip = await JSZip.loadAsync(bytes)
+  const ignore = '<ignoredErrors><ignoredError sqref="A1:Z1000" numberStoredAsText="1"/></ignoredErrors>'
+  // Where it goes in the sheet XML: before these, in the order the format requires.
+  const after = ['<smartTags', '<drawing', '<legacyDrawing', '<legacyDrawingHF', '<picture', '<oleObjects', '<controls', '<webPublishItems', '<tableParts', '<extLst', '</worksheet>']
+  for (const name of Object.keys(zip.files).filter((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))) {
+    const xml = await zip.file(name)!.async('string')
+    if (xml.includes('<ignoredErrors')) continue
+    const at = Math.min(...after.map((tag) => xml.indexOf(tag)).filter((i) => i >= 0))
+    zip.file(name, xml.slice(0, at) + ignore + xml.slice(at))
+  }
+  return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE' })
+}
+
+/** "$#,##0;($#,##0);-" -> "$#,##0;($#,##0);": an amount of 0 shows nothing instead of a dash. */
+function blankZero(st: Style): Style {
+  const parts = st.numFmt?.split(';')
+  return parts && parts.length >= 3 ? { ...st, numFmt: [parts[0], parts[1], '', ...parts.slice(3)].join(';') } : st
 }
 
 /** Fills one sheet that holds a copy of the template. */
@@ -113,15 +139,15 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     header: style('A7'),
     headerNum: style('B7'),
     text: style('A8'),
-    num: style('B8'),
+    num: blankZero(style('B8')),
     totalLabel: style('A20'),
-    totalNum: style('B20'),
+    totalNum: blankZero(style('B20')),
     expHeader: style('A48'),
     expHeaderNum: style('C48'),
     expText: style('A49'),
-    expNum: style('C49'),
+    expNum: blankZero(style('C49')),
     expTotal: style('A57'),
-    expTotalNum: style('C57'),
+    expTotalNum: blankZero(style('C57')),
     sumLabel: style('E48'),
     sumValue: style('F48'),
     incomeHeader: style('E56'),
