@@ -86,7 +86,8 @@ describe('buildReport', () => {
     expect(ws.getCell('E8').value).toBe('3/10')
     // Her choice: data centred horizontally.
     for (const addr of ['A8', 'C8', 'E8', 'F8']) expect(ws.getCell(addr).alignment?.horizontal).toBe('center')
-    // Section totals too (row 10: the insurance total).
+    // The big section titles, and section totals (row 10: the insurance total).
+    expect(ws.getCell('A6').alignment?.horizontal).toBe('center')
     for (const addr of ['C10', 'D10']) expect(ws.getCell(addr).alignment?.horizontal).toBe('center')
     expect(ws.getCell('A10').value).toBe('Insurance total')
     expect((ws.getCell('C10').value as { formula: string }).formula).toBe('SUM(C8:C9)')
@@ -116,6 +117,7 @@ describe('buildReport', () => {
     expect(ws.getCell(`G${notPaid.slice(1)}`).value).toBe(1)
     const billed = ws.getCell(`G${find('Total Billed').slice(1)}`).value as { formula: string }
     expect(billed.formula).toMatch(/^C\d+\+C\d+\+C\d+$/)
+    for (const label of ['Total Clients', 'Total Billed', 'Net']) expect(ws.getCell(`G${find(label).slice(1)}`).alignment?.horizontal).toBe('center')
     const net = ws.getCell(`G${find('Net').slice(1)}`).value as { formula: string; result: number }
     expect(net.formula).toMatch(/^G\d+-G\d+$/)
     // Collected 5 + 0 + 14×45 = 635, plus other income 900, minus expenses 18.

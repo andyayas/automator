@@ -202,7 +202,7 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     const rows = data.sections[type]
     if (type === 'free' && rows.length === 0) continue
     const cols = SECTION_COLUMNS[type]
-    span('A', 'G', r, TITLES[type], s.title)
+    span('A', 'G', r, TITLES[type], centred(s.title))
     if (heights.title) ws.getRow(r).height = heights.title
     r++
     for (const [label, field, from, to] of cols) span(from, to, r, label, isNumber(field) ? s.headerNum : s.header)
@@ -260,11 +260,13 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     ['Total Package Not Paid', data.packageNotPaid],
   ]
   // Money rows use the template's currency format; the two counts stay plain numbers.
-  const money: Style = { ...s.sumValue, numFmt: s.num.numFmt ?? s.sumValue.numFmt }
+  // Summary numbers centred, like the rest of the data.
+  const money: Style = centred({ ...s.sumValue, numFmt: s.num.numFmt ?? s.sumValue.numFmt })
+  const count: Style = centred(s.sumValue)
   const counts = new Set(['Total Clients', 'Total Package Not Paid'])
   summary.forEach(([label, value], i) => {
     put(`F${top + i}`, label, s.sumLabel)
-    put(`G${top + i}`, value, counts.has(label) ? s.sumValue : money)
+    put(`G${top + i}`, value, counts.has(label) ? count : money)
   })
   const collectedRow = top + 2
 
