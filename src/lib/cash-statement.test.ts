@@ -94,3 +94,27 @@ describe('helpers', () => {
     expect(toISODate('carried forward')).toBeNull()
   })
 })
+
+describe('a column added to the cash statement', () => {
+  it('still reads every field when a new column sits before Debit', () => {
+    // As if she inserted "Method" between Receipt/PV and Debit in $.
+    const head = ['Date', 'Client Name', 'Description', 'Receipt/PV', 'Method', 'Debit in $', 'Credit in $', 'Balance in $']
+    const sheet = utils.aoa_to_sheet([
+      [],
+      [],
+      [null, null, null, ...head],
+      [],
+      [],
+      [null, null, null, null, null, null, null, null, null, null, 100],
+      [null, null, null, new Date(2026, 9, 20), 'testa person', 'single physio session', 'rc7', 'cash', 45, null],
+      [null, null, null, null, 'acme water', '5 boxes of water', 'pv2', 'cash', null, 12],
+    ])
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, sheet, 'October')
+    const { rows } = parseCashStatement(wb)
+    expect(rows.map((r) => [r.voucher, r.debit, r.credit])).toEqual([
+      ['rc7', 45, null],
+      ['pv2', null, 12],
+    ])
+  })
+})
