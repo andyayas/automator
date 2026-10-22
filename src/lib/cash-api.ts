@@ -14,7 +14,7 @@ export async function fetchStoredCash(): Promise<StoredCash[]> {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
       .from('cash_transactions')
-      .select('id, date, source_key, name_raw, description, debit, credit, method, pos_amount, kind, missing_from_source')
+      .select('id, date, source_key, name_raw, description, debit, credit, method, pos_amount, kind, missing_from_source, balance')
       .order('id')
       .range(from, from + 999)
     fail(error)
@@ -60,6 +60,13 @@ export async function applyCashImport(plan: CashImportPlan, fileName: string, fi
       .update({ ...c.values, import_id: imp.id, missing_from_source: false })
       .eq('id', c.id)
     fail(error)
+  }
+  // Running balances, a few at a time.
+  for (let i = 0; i < plan.balances.length; i += 20) {
+    const results = await Promise.all(
+      plan.balances.slice(i, i + 20).map((b) => supabase.from('cash_transactions').update({ balance: b.balance }).eq('id', b.id)),
+    )
+    for (const r of results) fail(r.error)
   }
   for (const [ids, missing] of [
     [plan.missing, true],

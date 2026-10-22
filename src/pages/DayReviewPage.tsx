@@ -9,7 +9,7 @@ import { Badge, ErrorCard, Loading, PageHeader, Section } from '../components/ui
 import { createApproval, createPackage, type ApprovalWithBalance, type PackageWithBalance } from '../lib/api'
 import { confirmDay, downloadFile, downloadSavedReport, downloadTemplate, fetchMonth, dayBefore, reopenDay, saveReport, type SessionAnchor } from '../lib/day-api'
 import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type DayRow } from '../lib/day-builder'
-import { applyEdits, editsFromSessions, emptyEdits, frozenEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
+import { applyEdits, closingBalance, editsFromSessions, emptyEdits, frozenEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { monthReportDays, monthUpTo } from '../lib/month-report'
 import { formatDate, formatMoney, formatTime, numberText, parseNumber, plural, todayISO } from '../lib/format'
@@ -174,7 +174,9 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       downloadTemplate(),
     ])
     const stored = monthReportDays({ ...monthData, packages: packages.data ?? [], approvals: approvals.data ?? [] })
-    const current = rowsForReport ? toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel, approvals.data ?? []) : null
+    const current = rowsForReport
+      ? { ...toReportData(rowsForReport, expenses, otherIncome, packages.data ?? [], dateLabel, approvals.data ?? []), cashBalance: closingBalance(cash.data ?? []) }
+      : null
     return buildMonthReport(templateBytes, monthUpTo(stored, date, current))
   }
 

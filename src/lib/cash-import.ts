@@ -9,7 +9,7 @@ import type { NameMatch } from './names'
 
 export type StoredCash = Pick<
   Tables<'cash_transactions'>,
-  'id' | 'date' | 'source_key' | 'name_raw' | 'description' | 'debit' | 'credit' | 'method' | 'pos_amount' | 'kind' | 'missing_from_source'
+  'id' | 'date' | 'source_key' | 'name_raw' | 'description' | 'debit' | 'credit' | 'method' | 'pos_amount' | 'kind' | 'missing_from_source' | 'balance'
 >
 export type CashInsert = Omit<TablesInsert<'cash_transactions'>, 'owner_id' | 'id' | 'created_at' | 'updated_at'>
 
@@ -33,6 +33,8 @@ export type CashImportPlan = {
   /** Rows that were missing before and are back. */
   returned: string[]
   packageProposals: PackageProposal[]
+  /** Rows whose running balance changed or wasn't stored yet (saved quietly, not listed as changes). */
+  balances: Array<{ id: string; balance: number }>
   /** Package receipts whose payer matches no client. */
   unmatchedPackages: CashRow[]
 }
@@ -58,6 +60,7 @@ export function toInsert(r: CashRow, clientId: string | null): CashInsert {
     source_sheet: r.sheet,
     source_row: r.row,
     missing_from_source: false,
+    balance: r.balance,
   }
 }
 
@@ -70,7 +73,13 @@ export function planCashImport(
   /** Only receipts on or after this date become proposals (older ones are history the seed covered). */
   proposeFrom: string,
 ): CashImportPlan {
-  const plan: CashImportPlan = { inserts: [], changes: [], unchanged: 0, missing: [], returned: [], packageProposals: [], unmatchedPackages: [] }
+  const plan: CashImportPlan = { inserts: [], changes: [], unchanged: 0, missing: [], returned: [], packageProposals: [], balances: [], unmatchedPackages: [] }
+  // Balances are only needed for recent reports: older rows keep what they have.
+  const balanceFrom = (() => {
+    const d = new Date(`${proposeFrom}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - 62)
+    return d.toISOString().slice(0, 10)
+  })()
   const byKey = new Map(stored.map((s) => [s.source_key, s]))
   const seen = new Set<string>()
   const havePackage = new Set(existingPackages.map((p) => `${p.client_id}|${p.purchased_on}|${p.sessions_total}`))
@@ -108,6 +117,10 @@ export function planCashImport(
     if (Number(old.credit ?? 0) !== Number(values.credit ?? 0)) fields.push('credit')
     if (Number(old.pos_amount ?? 0) !== Number(values.pos_amount ?? 0)) fields.push('POS amount')
     if (old.method !== values.method) fields.push('method')
+    if (r.balance !== null && r.date >= balanceFrom && (old.balance === null || Number(old.balance) !== r.balance)) {
+      if (fields.length) values.balance = r.balance
+      else plan.balances.push({ id: old.id, balance: r.balance })
+    }
     if (fields.length) plan.changes.push({ id: old.id, row: r, fields, values })
     else if (old.missing_from_source) plan.returned.push(old.id)
     else plan.unchanged++

@@ -457,6 +457,15 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   `frozenEdits`); Edit this day reopens the day with them (older days are
   rebuilt from their sessions, `editsFromSessions`). The report shows package
   and insurance sessions as "7/12", data centred.
+- **Package paid status** (2026-10-22): the report's Package table has a
+  **Paid** column from the package's amount paid vs its price: green "Paid",
+  red "$300 due", empty when unknown (`packagePaid`). A later visit with
+  nothing collected still shows the package as paid.
+- **Cash balance** (2026-10-22): uploads read the cash statement's
+  "Balance In $" column (not "Balance IN LBP") into
+  `cash_transactions.balance`; balance-only differences are saved quietly for
+  the last two months. The report shows "Cash balance (statement)" under Net:
+  the balance on the day's last line (`closingBalance`).
 - **Name matching**: normalize (trim, lowercase, collapse spaces, strip
   status/number/amount tokens), then exact alias → fuzzy (token-sort ratio ≥ 0.85)
   against known clients → Contacts. Every confirmed match is saved as an alias,
@@ -487,7 +496,7 @@ nothing until she accepts them.
   (unique per owner; see "Voucher numbers are recycled"),
   debit, credit, method (cash/pos), pos_amount, kind
   (session/package/insurance_copay/insurer_payment/expense/other), client_id,
-  import_id
+  import_id, balance (the statement's running "Balance In $" on that row)
 - `schedule_entries`: date, slot_time, therapist, raw_text, parsed_name,
   status, session_no, inline_amount, client_id, import_id
 - `day_sessions`: date, client_id, therapist, billing_type, package_id,

@@ -17,6 +17,10 @@ export type ReportRow = {
   sessionNo: string | number | null
   serialNumber: string | null
   note: string
+  /** Package rows: "Paid", or what is still owed ("$300 due"); null when not known. */
+  paid?: string | null
+  /** True when the package is fully paid (green), false when money is owed (red). */
+  paidInFull?: boolean | null
 }
 export type ReportData = {
   dateLabel: string
@@ -26,6 +30,8 @@ export type ReportData = {
   otherIncome: Array<{ label: string; amount: number }>
   totalClients: number
   packageNotPaid: number
+  /** The cash statement's running balance after the day's last line, when known. */
+  cashBalance?: number | null
 }
 
 type Style = Partial<ExcelJS.Style>
@@ -60,7 +66,8 @@ const SECTION_COLUMNS: Record<BillingType, Col[]> = {
     ['Billed', 'billed', 'C', 'C'],
     ['Collected', 'collected', 'D', 'D'],
     ['Session No.', 'sessionNo', 'E', 'E'],
-    ['Extra Note', 'note', 'F', 'G'],
+    ['Paid', 'paid', 'F', 'F'],
+    ['Extra Note', 'note', 'G', 'G'],
   ],
   per_session: [
     ['Client', 'client', 'A', 'A'],
@@ -208,6 +215,15 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   const countStyle: Style = centred({ ...s.num, numFmt: '@' })
   const cellStyle = (field: keyof ReportRow | null) => (field === 'sessionNo' ? countStyle : centred(isNumber(field) ? s.num : s.text))
   const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
+  // Package paid in full: green; money still owed: red.
+  const paidStyle = (full: boolean): Style => {
+    const base = centred(s.text)
+    return {
+      ...base,
+      font: { ...(base.font ?? {}), bold: true, color: { argb: full ? 'FF1E6B34' : 'FFB42318' } },
+      fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: full ? 'FFDCF2E3' : 'FFFDE4E1' } },
+    }
+  }
 
   const totals: Partial<Record<BillingType, { billed: string; collected: string; billedValue: number; collectedValue: number }>> = {}
   for (const type of ['insurance', 'package', 'per_session', 'free'] as BillingType[]) {
@@ -225,7 +241,8 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
     for (const row of rows.length ? rows : [null]) {
       for (const [, field, from, to] of cols) {
         const value = row && field ? (row[field] ?? null) : null
-        span(from, to, r, value === '' ? null : (value as ExcelJS.CellValue), cellStyle(field))
+        const st = field === 'paid' && row?.paid ? paidStyle(row.paidInFull === true) : cellStyle(field)
+        span(from, to, r, value === '' ? null : (value as ExcelJS.CellValue), st)
       }
       if (heights.data) ws.getRow(r).height = heights.data
       r++
@@ -312,6 +329,9 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`G${incomeTop + 4}`, f(`C${expTotal}`, totalExpenses), money)
   put(`F${incomeTop + 5}`, 'Net', s.sumLabel)
   put(`G${incomeTop + 5}`, f(`G${incomeTop + 3}-G${incomeTop + 4}`, totalCollected + totalOther - totalExpenses), money)
+  // The cash statement's balance after the day's last line (its "Balance In $" column).
+  put(`F${incomeTop + 6}`, 'Cash balance (statement)', s.sumLabel)
+  put(`G${incomeTop + 6}`, data.cashBalance ?? null, money)
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
   // The template hides gridlines (showGridLines="false"), but ExcelJS reads that

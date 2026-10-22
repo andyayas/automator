@@ -117,4 +117,20 @@ describe('a column added to the cash statement', () => {
       ['pv2', null, 12],
     ])
   })
+
+  it('reads the running balance from the dollar Balance column, not the LBP one', () => {
+    const sheet = utils.aoa_to_sheet([
+      [],
+      [],
+      ['Credit in LBP', 'Balance IN LBP', null, ...HEAD],
+      [],
+      [],
+      [null, null, null, null, null, null, null, null, null, 100],
+      [null, 900000, null, new Date(2026, 9, 20), 'testa person', 'single physio session', 'rc8', 45, null, 145],
+      [null, 900000, null, null, 'acme water', '5 boxes of water', 'pv3', null, 12, 133],
+    ])
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, sheet, 'October')
+    expect(parseCashStatement(wb).rows.map((r) => r.balance)).toEqual([145, 133])
+  })
 })

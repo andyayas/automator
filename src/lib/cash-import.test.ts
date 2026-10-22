@@ -18,6 +18,7 @@ function cash(over: Partial<CashRow>): CashRow {
     descAmount: null,
     kind: 'session',
     packageSessions: null,
+    balance: null,
     sourceKey: '2026-10-01|rc1',
     ...over,
   }
@@ -27,6 +28,7 @@ const stored = (over: Partial<StoredCash>): StoredCash => ({
   id: 's1',
   date: '2026-10-01',
   source_key: '2026-10-01|rc1',
+  balance: null,
   name_raw: 'jane testerson',
   description: 'single physio session',
   debit: 45,
@@ -111,5 +113,34 @@ describe('planCashImport', () => {
   it('proposes from the day after the newest stored receipt, or the last 14 days on a first upload', () => {
     expect(proposalStartDate(['2026-10-05', '2026-10-07', '2026-09-30'], '2026-10-15')).toBe('2026-10-08')
     expect(proposalStartDate([], '2026-10-15')).toBe('2026-10-01')
+  })
+})
+
+describe('running balance', () => {
+  it('saves a new or changed balance quietly, without listing the row as changed', () => {
+    const plan = planCashImport(
+      [cash({ balance: 1250 }), cash({ sourceKey: '2026-10-01|rc2', voucher: 'rc2', balance: 1300 })],
+      [stored({ balance: null }), stored({ id: 's2', source_key: '2026-10-01|rc2', balance: 1300 })],
+      match,
+      nameOf,
+      [],
+      '2026-10-15',
+    )
+    expect(plan.balances).toEqual([{ id: 's1', balance: 1250 }])
+    expect(plan.changes).toEqual([])
+    expect(plan.unchanged).toBe(2)
+  })
+
+  it('keeps it with the other fields when the row changed anyway, and ignores old months', () => {
+    const plan = planCashImport(
+      [cash({ debit: 50, balance: 900 }), cash({ sourceKey: '2026-01-05|rc3', voucher: 'rc3', date: '2026-01-05', balance: 10 })],
+      [stored({ debit: 45 }), stored({ id: 's3', source_key: '2026-01-05|rc3', date: '2026-01-05' })],
+      match,
+      nameOf,
+      [],
+      '2026-10-15',
+    )
+    expect(plan.changes).toMatchObject([{ id: 's1', fields: ['debit'], values: { balance: 900 } }])
+    expect(plan.balances).toEqual([])
   })
 })

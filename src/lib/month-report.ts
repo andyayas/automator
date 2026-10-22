@@ -3,7 +3,7 @@
 
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { expenseKey, OTHER_INCOME } from './day-builder'
-import { sessionLabel } from './day-edits'
+import { closingBalance, packagePaid, sessionLabel } from './day-edits'
 import { displayName } from './names'
 import type { ReportData, ReportRow } from './report'
 import type { Tables } from './database.types'
@@ -39,7 +39,10 @@ export function monthReportDays(input: {
   snapshots?: Snapshot[]
   packages: PackageWithBalance[]
   approvals: ApprovalWithBalance[]
+  /** Cash statement rows with their running balance, for each day's closing balance. */
+  balances?: Array<{ date: string; balance: number | null; source_row: number | null }>
 }): Array<{ date: string; sheetName: string; data: ReportData }> {
+  const packageById = new Map(input.packages.map((p) => [p.id, p]))
   const serials = new Map(input.approvals.map((a) => [a.id, a.serial_number]))
   const totalsPkg = new Map(input.packages.map((p) => [p.id, p.sessions_total]))
   const totalsApp = new Map(input.approvals.map((a) => [a.id, a.sessions_approved]))
@@ -61,6 +64,7 @@ export function monthReportDays(input: {
             : null,
       ),
       serialNumber: s.approval_id ? (serials.get(s.approval_id) ?? null) : null,
+      ...(s.billing_type === 'package' ? (packagePaid(packageById.get(s.package_id ?? '')) ?? {}) : {}),
       note: s.extra_note ?? '',
     })
     const section = (t: string) => sessions.filter((s) => s.billing_type === t).map(toRow)
@@ -90,6 +94,7 @@ export function monthReportDays(input: {
         otherIncome,
         totalClients: new Set(sessions.map((s) => s.client_id ?? `name:${(s.client_name ?? '').toLowerCase()}`)).size,
         packageNotPaid: sessions.filter((s) => s.billing_type === 'package' && s.package_id && unpaid.has(s.package_id)).length,
+        cashBalance: closingBalance((input.balances ?? []).filter((b) => b.date === date)),
       },
     }
   })

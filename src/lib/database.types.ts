@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       cash_transactions: {
         Row: {
+          balance: number | null
           client_id: string | null
           created_at: string
           credit: number | null
@@ -37,6 +38,7 @@ export type Database = {
           voucher: string | null
         }
         Insert: {
+          balance?: number | null
           client_id?: string | null
           created_at?: string
           credit?: number | null
@@ -58,6 +60,7 @@ export type Database = {
           voucher?: string | null
         }
         Update: {
+          balance?: number | null
           client_id?: string | null
           created_at?: string
           credit?: number | null

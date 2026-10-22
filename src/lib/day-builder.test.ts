@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
-import { applyEdits, editsFromSessions, emptyEdits, frozenEdits, sessionLabel, toReportData } from './day-edits'
+import { applyEdits, closingBalance, editsFromSessions, emptyEdits, frozenEdits, packagePaid, sessionLabel, toReportData } from './day-edits'
 import { monthReportDays, monthUpTo } from './month-report'
 
 const base = {
@@ -404,5 +404,28 @@ describe('per-client price', () => {
     const d = buildDayDraft(inputs({ entries, clientPrices: new Map([['jane', 40]]) }))
     expect(d.rows.find((r) => r.clientId === 'jane')?.billed).toBe(40)
     expect(d.rows.find((r) => r.clientId === 'omar')?.billed).toBe(45)
+  })
+})
+
+describe('package paid status and the cash balance', () => {
+  it('says Paid when the package is paid in full, and what is owed otherwise', () => {
+    expect(packagePaid({ amount_paid: 450, price_total: 450 })).toEqual({ paid: 'Paid', paidInFull: true })
+    expect(packagePaid({ amount_paid: 150, price_total: 450 })).toEqual({ paid: '$300 due', paidInFull: false })
+    expect(packagePaid({ amount_paid: null, price_total: 450 })).toBeNull()
+  })
+
+  it('takes the balance on the day’s last line in the cash statement', () => {
+    expect(closingBalance([{ balance: 541, source_row: 7 }, { balance: 917, source_row: 9 }, { balance: 941, source_row: 8 }])).toBe(917)
+    expect(closingBalance([{ balance: null, source_row: 3 }])).toBeNull()
+  })
+
+  it('marks a package session paid on a later visit with nothing collected that day', () => {
+    // Paid 450 for 12 on the first visit; the second visit collects nothing.
+    const { rows } = applyEdits(
+      buildDayDraft(inputs({ entries: [entry({ client_id: 'omar' })], packages: [{ ...pkg('p1', 'omar', 1, 12), price_total: 450, amount_paid: 450 }] })),
+      emptyEdits(),
+    )
+    const data = toReportData(rows, [], [], [{ ...pkg('p1', 'omar', 1, 12), price_total: 450, amount_paid: 450 }], '10 October 2026')
+    expect(data.sections.package[0]).toMatchObject({ collected: 0, paid: 'Paid', paidInFull: true })
   })
 })

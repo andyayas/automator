@@ -26,6 +26,8 @@ export type CashRow = {
   kind: CashKind
   /** N from "Package of N", when present. */
   packageSessions: number | null
+  /** The running balance on this row (the "Balance" column), when there is one. */
+  balance: number | null
   /** Stable identity across re-uploads: date + voucher, or a content key. */
   sourceKey: string
 }
@@ -64,6 +66,7 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
     const data = sheetRows(workbook.Sheets[sheet])
     const cols = findColumns(data)
     if (!cols) continue
+    const balanceCol = findBalanceColumn(data)
     sheets.push(sheet)
     let currentDate: string | null = null
 
@@ -126,6 +129,7 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
         descAmount,
         kind,
         packageSessions: pkg ? Number(pkg[2]) : null,
+        balance: balanceCol === null ? null : money(r[balanceCol]),
       })
     }
   }
@@ -157,6 +161,18 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
 
 /** Money in for a row: debit, or the amount written in the description (POS etc.). */
 export const amountReceived = (r: CashRow) => r.debit ?? r.descAmount ?? 0
+
+/** The dollar running balance column ("Balance In $", not "Balance IN LBP"), from the header row. Optional. */
+function findBalanceColumn(data: unknown[][]): number | null {
+  for (let i = 0; i < Math.min(6, data.length); i++) {
+    const c = (data[i] ?? []).findIndex((cell) => {
+      const h = normalizeName(cell)
+      return /^balance\b/.test(h) && !/\blbp\b/.test(h)
+    })
+    if (c >= 0) return c
+  }
+  return null
+}
 
 function findColumns(data: unknown[][]): Columns | null {
   for (let i = 0; i < Math.min(6, data.length); i++) {

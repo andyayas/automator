@@ -13,7 +13,7 @@ export type DaySessionRow = Tables<'day_sessions'>
 export type DayReview = Tables<'day_reviews'>
 export type CashRowForDay = Pick<
   Tables<'cash_transactions'>,
-  'id' | 'name_raw' | 'description' | 'debit' | 'credit' | 'method' | 'pos_amount' | 'kind' | 'client_id'
+  'id' | 'name_raw' | 'description' | 'debit' | 'credit' | 'method' | 'pos_amount' | 'kind' | 'client_id' | 'balance' | 'source_row'
 >
 
 const BUCKET = 'private'
@@ -32,7 +32,7 @@ async function userFolder(): Promise<string> {
 export async function fetchCashForDay(date: string): Promise<CashRowForDay[]> {
   const { data, error } = await supabase
     .from('cash_transactions')
-    .select('id, name_raw, description, debit, credit, method, pos_amount, kind, client_id')
+    .select('id, name_raw, description, debit, credit, method, pos_amount, kind, client_id, balance, source_row')
     .eq('date', date)
     .eq('missing_from_source', false)
   fail(error)
@@ -266,7 +266,7 @@ export async function downloadSavedReport(path: string): Promise<Uint8Array> {
 /** Everything the month file needs, plus the working days not confirmed yet. */
 export async function fetchMonth(month: string, today: string, reviewsFrom: string | null = null) {
   const { from, to } = monthRange(month)
-  const [reviews, sessions, expenses, labels, scheduled] = await Promise.all([
+  const [reviews, sessions, expenses, labels, scheduled, balances] = await Promise.all([
     supabase.from('day_reviews').select('date, expenses, other_income').gte('date', from).lte('date', to).not('confirmed_at', 'is', null),
     supabase.from('day_sessions').select('*').gte('date', from).lte('date', to).eq('confirmed', true).order('created_at'),
     supabase
@@ -278,8 +278,15 @@ export async function fetchMonth(month: string, today: string, reviewsFrom: stri
       .eq('missing_from_source', false),
     supabase.from('expense_labels').select('match_key, label'),
     supabase.from('schedule_entries').select('date').gte('date', from).lte('date', to < today ? to : today).eq('is_non_client', false),
+    supabase
+      .from('cash_transactions')
+      .select('date, balance, source_row')
+      .gte('date', from)
+      .lte('date', to)
+      .not('balance', 'is', null)
+      .eq('missing_from_source', false),
   ])
-  for (const r of [reviews, sessions, expenses, labels, scheduled]) fail(r.error)
+  for (const r of [reviews, sessions, expenses, labels, scheduled, balances]) fail(r.error)
   const confirmedDates = reviews.data!.map((r) => r.date)
   // Days before "daily reviews start on" were reported outside the app.
   const notConfirmed = [...new Set(scheduled.data!.map((s) => s.date))]
@@ -292,5 +299,6 @@ export async function fetchMonth(month: string, today: string, reviewsFrom: stri
     sessions: sessions.data!,
     expenses: expenses.data!,
     labels: new Map(labels.data!.map((l) => [l.match_key, l.label])),
+    balances: balances.data!,
   }
 }

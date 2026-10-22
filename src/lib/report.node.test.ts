@@ -137,7 +137,12 @@ describe('with the clinic’s built-in template', () => {
     const template = new Uint8Array(readFileSync(new URL('../assets/daily-report-template.xlsx', import.meta.url)))
     const out = await buildReport(template, {
       ...data,
-      sections: { ...data.sections, insurance: [row('Jane Testerson', { serialNumber: '12345', billed: 25, collected: 0 })] },
+      sections: {
+        ...data.sections,
+        insurance: [row('Jane Testerson', { serialNumber: '12345', billed: 25, collected: 0 })],
+        package: [row('Omar Sample', { billed: 38, paid: 'Paid', paidInFull: true }), row('Rami Testa', { billed: 38, paid: '$300 due', paidInFull: false })],
+      },
+      cashBalance: 1234,
     })
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(out as unknown as ArrayBuffer)
@@ -145,6 +150,17 @@ describe('with the clinic’s built-in template', () => {
     expect(ws.getCell('D8').value).toBe(0)
     expect(ws.getCell('D8').numFmt?.split(';')[2]).toBe('') // zero shows nothing, not "-"
     expect(ws.getCell('F8').value).toBe('12345')
+    // Package paid status: green "Paid", red "$300 due"; the cash balance under Net.
+    let paidCell = '', dueCell = '', balanceRow = 0
+    ws.eachRow((r, n) => r.eachCell((c) => {
+      if (c.value === 'Paid') paidCell = c.address
+      if (c.value === '$300 due') dueCell = c.address
+      if (c.value === 'Cash balance (statement)') balanceRow = n
+    }))
+    expect(paidCell.startsWith('F')).toBe(true)
+    expect((ws.getCell(paidCell).fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFDCF2E3')
+    expect((ws.getCell(dueCell).fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFFDE4E1')
+    expect(ws.getCell(`G${balanceRow}`).value).toBe(1234)
     const zip = await JSZip.loadAsync(out)
     const sheet = await zip.file(Object.keys(zip.files).find((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))!)!.async('string')
     expect(sheet).toContain('numberStoredAsText="1"')

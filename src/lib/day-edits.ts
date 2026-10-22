@@ -153,6 +153,23 @@ export function editsFromSessions(draft: DayDraft, sessions: SavedSession[]): Da
   return edits
 }
 
+/**
+ * A package's payment status for the report: "Paid" (green) or what is still
+ * owed, e.g. "$300 due" (red). Null when the amount paid isn't known.
+ */
+export function packagePaid(p: { amount_paid: number | null; price_total: number } | undefined): { paid: string; paidInFull: boolean } | null {
+  if (!p || p.amount_paid === null || p.amount_paid === undefined) return null
+  const due = Math.round((Number(p.price_total) - Number(p.amount_paid)) * 100) / 100
+  return due <= 0 ? { paid: 'Paid', paidInFull: true } : { paid: `$${due.toLocaleString('en-US')} due`, paidInFull: false }
+}
+
+/** The cash statement's balance after a day's last line (the row lowest in the sheet that has one). */
+export function closingBalance(rows: Array<{ balance: number | null; source_row: number | null }>): number | null {
+  const withBalance = rows.filter((r) => r.balance !== null && r.balance !== undefined)
+  if (!withBalance.length) return null
+  return Number(withBalance.reduce((a, b) => ((b.source_row ?? 0) > (a.source_row ?? 0) ? b : a)).balance)
+}
+
 /** "7/12" for a package or insurance session, else the number on its own. */
 export function sessionLabel(sessionNo: number | null, total: number | null | undefined): string | number | null {
   if (sessionNo === null || sessionNo === undefined) return null
@@ -179,6 +196,7 @@ export function toReportData(
     therapist: r.therapist ?? '',
     billed: r.billed,
     collected: r.collected,
+    ...(r.billingType === 'package' ? (packagePaid(packages.find((p) => p.id === r.packageId)) ?? {}) : {}),
     sessionNo: sessionLabel(r.sessionNo, totalOf(r)),
     serialNumber: r.serialNumber,
     note: r.extraNote,
