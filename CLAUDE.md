@@ -603,7 +603,8 @@ locally before calling a phase done.
    (cash upload + live sheet), Clients (flagged first), Money (expenses,
    other income), Confirm (totals, preview, confirm). It opens on Clients when
    the data is already in.
-   **Every report is the month so far** (her decision, 2026-10-16): one file
+   **Every report is the month so far** (her decision, 2026-10-16; briefly one
+   tab per day on 2026-10-20, reverted 2026-10-22 at her request): one file
    with a tab per confirmed day of the month up to and including that day
    (`monthUpTo` in `src/lib/month-report.ts`), like her old monthly workbooks.
    Preview and Confirm use the draft for that day's tab; a confirmed day's
