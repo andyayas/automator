@@ -66,7 +66,7 @@ const SECTION_COLUMNS: Record<BillingType, Col[]> = {
     ['Billed', 'billed', 'C', 'C'],
     ['Collected', 'collected', 'D', 'D'],
     ['Session No.', 'sessionNo', 'E', 'E'],
-    ['Paid', 'paid', 'F', 'F'],
+    ['Status', 'paid', 'F', 'F'],
     ['Extra Note', 'note', 'G', 'G'],
   ],
   per_session: [

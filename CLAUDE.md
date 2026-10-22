@@ -458,7 +458,7 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   rebuilt from their sessions, `editsFromSessions`). The report shows package
   and insurance sessions as "7/12", data centred.
 - **Package paid status** (2026-10-22): the report's Package table has a
-  **Paid** column from the package's amount paid vs its price: green "Paid",
+  **Status** column from the package's amount paid vs its price: green "Paid",
   red "$300 due", empty when unknown (`packagePaid`). A later visit with
   nothing collected still shows the package as paid.
 - **Cash balance** (2026-10-22): uploads read the cash statement's

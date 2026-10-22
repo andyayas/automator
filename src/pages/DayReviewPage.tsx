@@ -48,6 +48,9 @@ function storeEdits(date: string, edits: DayEdits | null) {
   }
 }
 
+/** Her choice: every download is simply "Daily Report" (the tabs inside say which days). */
+const REPORT_FILE = 'Daily Report.xlsx'
+
 export function DayReviewPage() {
   const { date = todayISO() } = useParams()
   const navigate = useNavigate()
@@ -185,7 +188,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setBusy('Building the preview…')
     setError(null)
     try {
-      downloadFile(await makeReport(final.rows), `Daily Report ${date} (preview).xlsx`)
+      downloadFile(await makeReport(final.rows), REPORT_FILE)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -220,7 +223,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
       const bytes = await makeReport(final.rows)
       setBusy('Saving the report…')
       await saveReport(date, bytes)
-      downloadFile(bytes, `Daily Report ${date}.xlsx`)
+      downloadFile(bytes, REPORT_FILE)
       storeEdits(date, null)
       setEdits(emptyEdits())
       await invalidate.day()
@@ -255,10 +258,10 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setError(null)
     try {
       // Rebuilt from the confirmed days, so a corrected earlier day shows corrected.
-      downloadFile(await makeReport(null), `Daily Report ${date}.xlsx`)
+      downloadFile(await makeReport(null), REPORT_FILE)
     } catch (err) {
       const path = review.data?.review?.report_storage_path
-      if (path) downloadFile(await downloadSavedReport(path), `Daily Report ${date}.xlsx`)
+      if (path) downloadFile(await downloadSavedReport(path), REPORT_FILE)
       else setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(null)
