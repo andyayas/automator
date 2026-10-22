@@ -155,7 +155,7 @@ describe('with the clinic’s built-in template', () => {
     ws.eachRow((r, n) => r.eachCell((c) => {
       if (c.value === 'Paid') paidCell = c.address
       if (c.value === '$300 due') dueCell = c.address
-      if (c.value === 'Cash balance (statement)') balanceRow = n
+      if (c.value === 'Balance') balanceRow = n
     }))
     expect(paidCell.startsWith('F')).toBe(true)
     expect((ws.getCell(paidCell).fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFDCF2E3')

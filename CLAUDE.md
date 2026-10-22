@@ -464,7 +464,7 @@ go-live seed uses it ahead of schedule session numbers and file counts.
 - **Cash balance** (2026-10-22): uploads read the cash statement's
   "Balance In $" column (not "Balance IN LBP") into
   `cash_transactions.balance`; balance-only differences are saved quietly for
-  the last two months. The report shows "Cash balance (statement)" under Net:
+  the last two months. The report shows "Balance" under Net:
   the balance on the day's last line (`closingBalance`).
 - **Name matching**: normalize (trim, lowercase, collapse spaces, strip
   status/number/amount tokens), then exact alias → fuzzy (token-sort ratio ≥ 0.85)

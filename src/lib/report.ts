@@ -330,7 +330,7 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`F${incomeTop + 5}`, 'Net', s.sumLabel)
   put(`G${incomeTop + 5}`, f(`G${incomeTop + 3}-G${incomeTop + 4}`, totalCollected + totalOther - totalExpenses), money)
   // The cash statement's balance after the day's last line (its "Balance In $" column).
-  put(`F${incomeTop + 6}`, 'Cash balance (statement)', s.sumLabel)
+  put(`F${incomeTop + 6}`, 'Balance', s.sumLabel)
   put(`G${incomeTop + 6}`, data.cashBalance ?? null, money)
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
