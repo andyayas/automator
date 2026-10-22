@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router'
 import { Empty, ErrorCard, Loading, PageHeader, Section } from '../components/ui'
 import { removeTemplate, uploadTemplate } from '../lib/day-api'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
-import { formatDate, parseNumber } from '../lib/format'
+import { formatDate, parseNumber, todayISO } from '../lib/format'
+import { CHECKIN_PLACEHOLDERS, DEFAULT_CHECKIN_TEMPLATE, renderCheckin } from '../lib/checkins'
 import { normalizeName } from '../lib/names'
 import { connectGoogle, disconnectGoogle, googleConfigured, loadGoogleScript } from '../lib/google'
 import { keys, useGoogleStatus, useInvalidate, usePatterns, useSettings, useTemplateInfo } from '../lib/queries'
@@ -39,6 +40,7 @@ export function SettingsPage() {
       {/* What she uses: the month's sheet link, Google, and the reminder message. */}
       <SheetLinks settings={settings.data} />
       <ReminderSettings settings={settings.data} />
+      <CheckinSettings settings={settings.data} />
       {googleConfigured && <GoogleConnection />}
 
       <button
@@ -89,6 +91,40 @@ function useSaver() {
   const note =
     state === 'saving' ? 'Saving…' : state === 'saved' ? 'Saved' : state === 'idle' ? null : state
   return { save, note, isError: !['idle', 'saving', 'saved'].includes(state) }
+}
+
+/** The check-in message (Reminders → Check-ins); signed with the same sender name. */
+function CheckinSettings({ settings }: { settings: Record<string, unknown> }) {
+  const [template, setTemplate] = useState((settings[SETTING.checkinTemplate] as string) || DEFAULT_CHECKIN_TEMPLATE)
+  const { save, note, isError } = useSaver()
+  const sender = (settings[SETTING.senderName] as string) || '{sender_name}'
+  const preview = renderCheckin(template, { name: 'Client', lastVisit: todayISO(), senderName: sender })
+  return (
+    <Section title="Check-in message">
+      <form
+        className="card form"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void save(SETTING.checkinTemplate, template)
+        }}
+      >
+        <Field label="Message" hint={`For clients who haven't been back for 30 days. You can use ${CHECKIN_PLACEHOLDERS.join(' ')}`}>
+          <textarea rows={8} value={template} onChange={(e) => setTemplate(e.target.value)} />
+        </Field>
+        <p className="muted small">Preview</p>
+        <pre className="preview">{preview}</pre>
+        {note && <p className={isError ? 'error' : 'muted small'}>{note}</p>}
+        <div className="row-buttons">
+          <button type="submit" className="button primary">
+            Save
+          </button>
+          <button type="button" className="button ghost" onClick={() => setTemplate(DEFAULT_CHECKIN_TEMPLATE)}>
+            Reset message
+          </button>
+        </div>
+      </form>
+    </Section>
+  )
 }
 
 function ReminderSettings({ settings }: { settings: Record<string, unknown> }) {

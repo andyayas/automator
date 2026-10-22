@@ -98,6 +98,50 @@ export type Database = {
           },
         ]
       }
+      checkins: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          last_visit: string
+          owner_id: string
+          phone_used: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          last_visit: string
+          owner_id?: string
+          phone_used?: string | null
+          sent_at?: string | null
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          last_visit?: string
+          owner_id?: string
+          phone_used?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkins_client_id_owner_id_fkey"
+            columns: ["client_id", "owner_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id", "owner_id"]
+          },
+        ]
+      }
       client_aliases: {
         Row: {
           alias: string

@@ -1,6 +1,7 @@
 import { Link } from 'react-router'
-import { CheckIcon, PendingIcon, RemindersIcon } from '../layout/icons'
+import { CheckIcon, ClientsIcon, PendingIcon, RemindersIcon } from '../layout/icons'
 import { formatDate } from '../lib/format'
+import { useCheckinsDue } from '../lib/queries'
 import { useReviewDays, workingDay } from '../lib/review-days'
 import { Badge } from './ui'
 
@@ -11,6 +12,8 @@ const dayLabel = (date: string) =>
 export function DailyReviewCard() {
   const { today, days, earlier } = useReviewDays()
   const reminderDay = workingDay(today, 1)
+  const checkins = useCheckinsDue(today)
+  const checkinCount = checkins.data?.length ?? 0
   return (
     <>
       <div className="card list">
@@ -37,6 +40,20 @@ export function DailyReviewCard() {
           </span>
           <span className="chevron">›</span>
         </Link>
+        {checkinCount > 0 && (
+          <Link to="/reminders?tab=checkins" className="list-row link task-row">
+            <span className="task-icon">
+              <ClientsIcon />
+            </span>
+            <span className="row-text grow">
+              <span className="strong">Check-ins</span>
+              <span className="muted small">
+                {checkinCount === 1 ? '1 client hasn’t' : `${checkinCount} clients haven’t`} been back in 30 days
+              </span>
+            </span>
+            <span className="chevron">›</span>
+          </Link>
+        )}
       </div>
       {earlier.length > 0 && (
         <div className="card notice earlier-days">

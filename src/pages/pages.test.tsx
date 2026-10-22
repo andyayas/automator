@@ -23,6 +23,7 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('../lib/api', () => api)
 vi.mock('../lib/schedule-api', () => ({ fetchSettings: async () => ({}) }))
+vi.mock('../lib/checkins-api', () => ({ fetchCheckinsDue: async () => [], markCheckin: async () => {} }))
 vi.mock('../lib/day-api', () => ({ fetchRecentReviews: async () => [], fetchMonth: async () => ({ notConfirmed: [], confirmedDates: [] }) }))
 
 const jane = { id: 'c1', name: 'Jane Testerson', phone: '96171000001' }

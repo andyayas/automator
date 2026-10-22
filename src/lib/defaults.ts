@@ -25,6 +25,8 @@ export const SETTING = {
   defaultsSeeded: 'defaults_seeded',
   senderName: 'sender_name',
   reminderTemplate: 'reminder_template',
+  /** The check-in message for clients who haven't been back for 30 days. */
+  checkinTemplate: 'checkin_template',
   staffNames: 'staff_names',
   sheetLinks: 'sheet_links',
   perSessionPrice: 'per_session_price',

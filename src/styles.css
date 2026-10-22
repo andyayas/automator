@@ -1870,3 +1870,8 @@ details.card[open] > summary {
 .row-text.grow {
   min-width: 0;
 }
+
+/* Check-ins: Skip sits quietly under Send. */
+.checkin-skip {
+  align-self: center;
+}

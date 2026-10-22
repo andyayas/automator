@@ -466,6 +466,13 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   `cash_transactions.balance`; balance-only differences are saved quietly for
   the last two months. The report shows "Balance" under Net:
   the balance on the day's last line (`closingBalance`).
+- **Check-ins** (2026-10-22): Reminders → **Check-ins** lists clients whose
+  last visit (a confirmed review day or a C booking, from 1 Oct 2026) was 30+
+  days ago and who have nothing booked; Today shows a row when any are due.
+  Send opens WhatsApp with the check-in message (Settings → Check-in message,
+  `{name}` `{last_visit}` `{sender_name}`); Send or Skip is saved in
+  `checkins` per client and last visit, so they come back only after a new
+  visit (`src/lib/checkins.ts`).
 - **Name matching**: normalize (trim, lowercase, collapse spaces, strip
   status/number/amount tokens), then exact alias → fuzzy (token-sort ratio ≥ 0.85)
   against known clients → Contacts. Every confirmed match is saved as an alias,
@@ -508,6 +515,8 @@ nothing until she accepts them.
   confirmed, used by the month file)
 - `reminders`: date, slot_time, therapist, client_id, phone_used, sent_at
   (unique on date + slot_time + client_id)
+- `checkins`: client_id, last_visit, status (sent/skipped), phone_used, sent_at
+  (unique on client_id + last_visit; deleted with the client on a merge)
 - `imports`: kind (cash/schedule), filename, imported_at, rows_added,
   rows_changed
 - `settings`: key → JSON for single values: staff names, default rates,

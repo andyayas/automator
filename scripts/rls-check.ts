@@ -89,6 +89,7 @@ const FIXTURES: Array<{ table: string; row: (ids: Ids) => Row }> = [
   },
   { table: 'day_reviews', row: () => ({ date: DAY }) },
   { table: 'reminders', row: (ids) => ({ date: DAY, slot_time: '07:00', client_id: ids.clients }) },
+  { table: 'checkins', row: (ids) => ({ client_id: ids.clients, last_visit: DAY, status: 'skipped' }) },
   { table: 'settings', row: () => ({ key: 'rls_check', value: { tag: TAG } }) },
   { table: 'non_client_patterns', row: () => ({ pattern: TAG, match_type: 'exact' }) },
   { table: 'expense_labels', row: () => ({ match_key: `${TAG}|test`, label: 'Test' }) },

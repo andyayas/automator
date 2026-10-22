@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DateNav, LinkClientDialog } from '../components/schedule-ui'
+import { CheckinsList } from '../components/CheckinsList'
 import { SheetRefresh } from '../components/SheetRefresh'
 import { Badge, Empty, ErrorCard, Loading, PageHeader } from '../components/ui'
 import { updateClient } from '../lib/api'
@@ -25,6 +26,29 @@ export function RemindersPage() {
   const [linking, setLinking] = useState<ScheduleEntry | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const tab = params.get('tab') === 'checkins' ? 'checkins' : 'tomorrow'
+  const tabs = (
+    <div className="tabs" role="tablist" aria-label="Reminder lists">
+      {(
+        [
+          ['tomorrow', 'Appointments'],
+          ['checkins', 'Check-ins'],
+        ] as const
+      ).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          role="tab"
+          aria-selected={tab === id}
+          className={`tab ${tab === id ? 'active' : ''}`}
+          onClick={() => setParams(id === 'checkins' ? { tab: id } : params.get('date') ? { date: params.get('date')! } : {}, { replace: true })}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
   const template = (settings.data?.[SETTING.reminderTemplate] as string | undefined) || DEFAULT_REMINDER_TEMPLATE
   const senderName = (settings.data?.[SETTING.senderName] as string | undefined) ?? ''
 
@@ -48,6 +72,16 @@ export function RemindersPage() {
     }
   }
 
+  if (tab === 'checkins') {
+    return (
+      <section className="page">
+        <PageHeader title="Reminders" />
+        {tabs}
+        <CheckinsList />
+      </section>
+    )
+  }
+
   return (
     <section className="page">
       <PageHeader
@@ -60,6 +94,7 @@ export function RemindersPage() {
           )
         }
       />
+      {tabs}
       <DateNav date={date} onChange={(d) => setParams({ date: d }, { replace: true })} />
       <SheetRefresh date={date} />
 

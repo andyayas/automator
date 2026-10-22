@@ -2,6 +2,7 @@ import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as api from './api'
 import * as sched from './schedule-api'
 import * as day from './day-api'
+import * as checkins from './checkins-api'
 import { fetchGoogleStatus } from './google'
 
 export const queryClient = new QueryClient({
@@ -64,6 +65,7 @@ export const useDayCash = (date: string) => useQuery({ queryKey: keys.dayCash(da
 export const useDayReview = (date: string) => useQuery({ queryKey: keys.dayReview(date), queryFn: () => day.fetchDayReview(date) })
 export const useExpenseLabels = () => useQuery({ queryKey: keys.expenseLabels, queryFn: day.fetchExpenseLabels })
 export const useTemplateInfo = () => useQuery({ queryKey: keys.template, queryFn: day.templateInfo })
+export const useCheckinsDue = (today: string) => useQuery({ queryKey: ['checkins', today], queryFn: () => checkins.fetchCheckinsDue(today) })
 export const useLatestCashDate = () => useQuery({ queryKey: keys.latestCash, queryFn: day.fetchLatestCashDate })
 
 /** Refetch everything that shows packages or approvals after a change. */
