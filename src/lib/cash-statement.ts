@@ -110,7 +110,7 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
               ? 'insurance_copay'
               : insurers.some((ins) => name === ins || name.startsWith(`${ins} `))
                 ? 'insurer_payment'
-                : /session/.test(descLower)
+                : /session|physio/.test(descLower)
                   ? 'session'
                   : 'other'
 

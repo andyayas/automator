@@ -3,7 +3,7 @@
 // confirms it (CLAUDE.md "Propose, then confirm").
 
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
-import { displayName, normalizeName } from './names'
+import { displayName, FUZZY_THRESHOLD, normalizeName, tokenSortRatio } from './names'
 
 export type BillingType = 'insurance' | 'package' | 'per_session' | 'free'
 export type FlagKind =
@@ -273,6 +273,37 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   const excludedNotes: Array<string | null> = []
   const bookings = input.entries.filter((e) => !e.is_non_client).sort((a, b) => a.slot_time.localeCompare(b.slot_time))
 
+  // A payer who isn't booked today is often a booking spelled another way
+  // ("jane testerson" paid, "Jane Testersen" booked; "omar" paid, "Omar
+  // (Therapist A)" booked). Their money goes on the one unpaid booking whose name is
+  // close, flagged for her to check.
+  const paidAs = new Map<string, string>()
+  const linkedId = (e: EntryInput) => (e.match_kind !== 'none' ? e.client_id : null)
+  const booked = new Set(bookings.map(linkedId).filter(Boolean))
+  const unpaid = bookings.filter((e) => linkedId(e) && e.status !== 'cancelled' && e.status !== 'rescheduled')
+  const bookingNames = (e: EntryInput) => [e.parsed_name, input.clientNames.get(e.client_id!)].map(normalizeName).filter(Boolean)
+  const strays = [
+    ...[...clientCash].filter(([id]) => !booked.has(id)).map(([key, cash]) => ({ from: clientCash, key, cash })),
+    ...[...unknownCash].map(([key, cash]) => ({ from: unknownCash, key, cash })),
+  ]
+  for (const stray of strays) {
+    const payer = normalizeName(stray.cash[0].name_raw)
+    if (!payer || stray.cash.some((c) => c.kind === 'insurer_payment')) continue
+    const open = unpaid.filter((e) => !clientCash.has(e.client_id!))
+    let hits = open
+      .map((e) => ({ e, score: Math.max(...bookingNames(e).map((n) => tokenSortRatio(payer, n))) }))
+      .filter((h) => h.score >= FUZZY_THRESHOLD)
+      .sort((a, b) => b.score - a.score)
+    if (!hits.length && !payer.includes(' ')) {
+      hits = open.filter((e) => bookingNames(e).some((n) => n.split(' ')[0] === payer)).map((e) => ({ e, score: 1 }))
+    }
+    const best = hits[0]
+    if (!best || new Set(hits.filter((h) => h.score === best.score).map((h) => h.e.client_id)).size > 1) continue
+    stray.from.delete(stray.key)
+    clientCash.set(best.e.client_id!, stray.cash)
+    paidAs.set(best.e.client_id!, stray.cash[0].name_raw ?? payer)
+  }
+
   for (const e of bookings) {
     const linked = e.match_kind !== 'none' ? e.client_id : null
     const row: DayRow = {
@@ -293,6 +324,8 @@ export function buildDayDraft(input: DayInputs): DayDraft {
     }
     if (!linked) row.flags.push({ kind: 'unmatched', text: 'Name not linked to a client' })
     else if (e.match_kind === 'fuzzy') row.flags.push({ kind: 'uncertain-name', text: `Sheet says “${e.parsed_name}”: check it’s this client` })
+    const payer = linked && paidAs.get(linked)
+    if (payer) row.flags.push({ kind: 'uncertain-name', text: `Paid as “${payer}”: check it’s this client` })
     if (row.status === 'unknown') row.flags.push({ kind: 'no-status', text: 'No C/X/R on the sheet: did they come?' })
     bill(row, e.billing_note)
     if (row.sheetSessionNo && row.sessionNo && row.sheetSessionNo !== row.sessionNo) {

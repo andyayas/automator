@@ -102,6 +102,41 @@ describe('buildDayDraft', () => {
     expect(d.rows[0]).toMatchObject({ clientName: 'Jane Testerson', billingType: 'per_session', billed: 40, collected: 40, paymentMethod: 'cash', flags: [] })
   })
 
+  it('puts a payment spelled differently on the unpaid booking it matches, flagged', () => {
+    const d = buildDayDraft(
+      inputs({
+        entries: [
+          entry({ id: 'b1', client_id: 'jane', parsed_name: 'Jane Testersen', slot_time: '09:00:00' }),
+          entry({ id: 'b2', client_id: 'omar', parsed_name: 'Omar (Therapist A)', status: 'unknown', slot_time: '13:00:00' }),
+        ],
+        cash: [
+          cash({ client_id: 'jane-copy', name_raw: 'jane testerson', debit: 40 }),
+          cash({ client_id: null, name_raw: 'omar', debit: 45 }),
+        ],
+      }),
+    )
+    expect(d.rows.map((r) => [r.key, r.collected])).toEqual([
+      ['entry:b1', 40],
+      ['entry:b2', 45],
+    ])
+    expect(d.rows[0].flags).toEqual([{ kind: 'uncertain-name', text: 'Paid as “jane testerson”: check it’s this client' }])
+    expect(d.rows[1].flags.map((f) => f.kind)).toEqual(['uncertain-name', 'no-status'])
+  })
+
+  it('leaves a payment alone when two unpaid bookings fit it equally', () => {
+    const d = buildDayDraft(
+      inputs({
+        entries: [
+          entry({ id: 't1', client_id: 'lina', parsed_name: 'Lina One' }),
+          entry({ id: 't2', client_id: 'rami', parsed_name: 'Lina Two', slot_time: '10:00:00' }),
+        ],
+        cash: [cash({ client_id: null, name_raw: 'lina', debit: 45 })],
+      }),
+    )
+    expect(d.rows.find((r) => r.key.startsWith('cash:'))?.flags.map((f) => f.kind)).toEqual(['paid-not-scheduled', 'unmatched'])
+    expect(d.rows.filter((r) => r.scheduleEntryId).every((r) => r.collected === 0)).toBe(true)
+  })
+
   it('uses the package and counts the session number', () => {
     const d = buildDayDraft(inputs({ entries: [entry({ client_id: 'omar', session_no: 5 })], packages: [pkg('p1', 'omar', 4)] }))
     expect(d.rows[0]).toMatchObject({ billingType: 'package', packageId: 'p1', billed: 40, collected: 0, sessionNo: 5, flags: [] })

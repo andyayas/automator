@@ -61,6 +61,11 @@ describe('parseCashStatement', () => {
     expect(rows.find((r) => r.method === 'transfer')).toMatchObject({ voucher: null, descAmount: 45, kind: 'session' })
   })
 
+  it('counts "single physio" as a session payment, even without the word session', () => {
+    const one = parseCashStatement(book({ October: [[new Date(2026, 9, 27), 'testg person', 'single physio', 'rc41', 40, null]] })).rows[0]
+    expect(one).toMatchObject({ kind: 'session', debit: 40 })
+  })
+
   it('skips repeated headers and totals', () => {
     expect(skipped).toBe(2)
     expect(rows).toHaveLength(9)
