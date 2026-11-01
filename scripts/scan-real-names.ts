@@ -26,7 +26,7 @@ const add = (raw: unknown) => {
   if (n.split(' ').length >= 2 && n.length >= 7 && !isNonClient(n, DEFAULT_NON_CLIENT_PATTERNS)) names.add(n)
 }
 
-for (const file of readdirSync(SAMPLES).filter((f) => f.endsWith('.xlsx') && !f.startsWith('Cash Statement'))) {
+for (const file of readdirSync(SAMPLES).filter((f) => f.endsWith('.xlsx') && !/cash statement/i.test(f))) {
   const wb = read(readFileSync(join(SAMPLES, file)), { type: 'buffer' })
   if (wb.SheetNames.some((n) => n.trim().toLowerCase() === 'contacts')) {
     for (const c of parseContacts(wb).contacts) add(c.name)

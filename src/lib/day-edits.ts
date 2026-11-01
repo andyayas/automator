@@ -33,7 +33,35 @@ export type DayEdits = {
 
 export const emptyEdits = (): DayEdits => ({ rows: {}, removed: [], restored: [], added: [], labels: {}, asIncome: [], asSession: [] })
 
-export function applyEdits(draft: DayDraft, edits: DayEdits): { rows: DayRow[]; excluded: DayRow[] } {
+type Link = { id: string; client_id: string; status: string }
+
+/**
+ * A saved row can point at a package or approval that was cancelled or
+ * deleted since (a duplicate made from the review, then cancelled). It moves
+ * to the client's active one, and the serial number is read from the
+ * approval it ends up on.
+ */
+function relink(row: DayRow, links: { packages: Link[]; approvals: Array<Link & { serial_number: string | null }> }): DayRow {
+  const live = <T extends Link>(list: T[], id: string | null) => {
+    const current = list.find((x) => x.id === id)
+    if (current && current.status !== 'cancelled') return current
+    return list.find((x) => x.client_id === row.clientId && x.status === 'active') ?? current
+  }
+  const next = { ...row }
+  if (next.billingType === 'package') next.packageId = live(links.packages, next.packageId)?.id ?? next.packageId
+  if (next.billingType === 'insurance') {
+    const ap = live(links.approvals, next.approvalId)
+    next.approvalId = ap?.id ?? next.approvalId
+    next.serialNumber = ap ? ap.serial_number : next.serialNumber
+  }
+  return next
+}
+
+export function applyEdits(
+  draft: DayDraft,
+  edits: DayEdits,
+  links?: { packages: Link[]; approvals: Array<Link & { serial_number: string | null }> },
+): { rows: DayRow[]; excluded: DayRow[] } {
   const restored = draft.excluded.filter((r) => edits.restored.includes(r.key)).map((r) => ({ ...r, status: 'confirmed' as const }))
   const excluded = draft.excluded.filter((r) => !edits.restored.includes(r.key))
   const all = [...draft.rows, ...restored, ...edits.added]
@@ -49,6 +77,7 @@ export function applyEdits(draft: DayDraft, edits: DayEdits): { rows: DayRow[]; 
       next.flags = next.clientId ? [] : r.flags.filter((f) => f.kind === 'unmatched')
       return next
     })
+    .map((r) => (links ? relink(r, links) : r))
   return { rows, excluded: [...excluded, ...all.filter((r) => edits.removed.includes(r.key))] }
 }
 

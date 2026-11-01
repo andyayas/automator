@@ -120,7 +120,10 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   }, [date, entries.data, cash.data, packages.data, approvals.data, clients.data, labels.data, defaults, edits.asIncome, edits.asSession])
 
   const confirmed = Boolean(review.data?.review?.confirmed_at)
-  const final = useMemo(() => (draft ? applyEdits(draft, edits) : null), [draft, edits])
+  const final = useMemo(
+    () => (draft ? applyEdits(draft, edits, { packages: packages.data ?? [], approvals: approvals.data ?? [] }) : null),
+    [draft, edits, packages.data, approvals.data],
+  )
   const expenses = useMemo(
     () => (draft?.expenses ?? []).map((e) => ({ ...e, label: edits.labels[e.cashId] ?? e.label })),
     [draft, edits.labels],

@@ -391,6 +391,18 @@ describe('editing a confirmed day', () => {
     expect(rows.find((r) => r.key === 'entry:y2')).toBeUndefined()
   })
 
+  it('moves a row saved on a since-cancelled approval to the active one, with its serial', () => {
+    const real = { ...approval('a-real', 'lina', 4), serial_number: 'S-REAL' }
+    const dup = { ...approval('a-dup', 'lina', 4), serial_number: null, status: 'cancelled' as const }
+    const day = buildDayDraft(inputs({ entries: [entry({ id: 'z1', client_id: 'lina' })], approvals: [real] }))
+    const edits = { ...emptyEdits(), rows: { 'entry:z1': { billingType: 'insurance' as const, approvalId: 'a-dup', sessionNo: 5 } } }
+
+    const row = applyEdits(day, edits, { packages: [], approvals: [real, dup] }).rows[0]
+    expect(row).toMatchObject({ approvalId: 'a-real', serialNumber: 'S-REAL', sessionNo: 5 })
+    // With no active one to move to, the row stays as saved.
+    expect(applyEdits(day, edits, { packages: [], approvals: [dup] }).rows[0].approvalId).toBe('a-dup')
+  })
+
   it('writes "7/12" labels and plain numbers otherwise', () => {
     expect(sessionLabel(7, 12)).toBe('7/12')
     expect(sessionLabel(3, null)).toBe(3)
