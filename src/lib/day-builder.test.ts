@@ -478,7 +478,7 @@ describe('package paid status and the cash balance', () => {
 })
 
 describe('bank transfers', () => {
-  it('leaves money moved to or from the bank out of income and expenses', () => {
+  it('counts a deposit as an expense and money from the bank as other income', () => {
     const d = buildDayDraft(
       inputs({
         cash: [
@@ -488,7 +488,7 @@ describe('bank transfers', () => {
       }),
     )
     expect(d.rows).toEqual([])
-    expect(d.expenses).toEqual([])
-    expect(d.otherIncome).toEqual([])
+    expect(d.expenses.map((e) => [e.label, e.amount])).toEqual([['Deposit', 500]])
+    expect(d.otherIncome.map((e) => [e.label, e.amount])).toEqual([['Cash · Audi Bank Neo', 28]])
   })
 })

@@ -66,7 +66,7 @@ describe('parseCashStatement', () => {
     expect(one).toMatchObject({ kind: 'session', debit: 40 })
   })
 
-  it('tells cash moved to or from the bank apart from income and spending', () => {
+  it('tells cash moved to or from the bank apart from client payments', () => {
     expect(isBankTransfer('audi bank neo', 'deposit', null, 1500)).toBe(true)
     expect(isBankTransfer('audi bank neo', 'cash', 28, null)).toBe(true)
     expect(isBankTransfer('sgbl', 'collect from account', 650, null)).toBe(true)

@@ -74,12 +74,17 @@ export function monthReportDays(input: {
     const expenses: Line[] = Array.isArray(snap?.expenses)
       ? (snap!.expenses as Line[])
       : cash
-          .filter((e) => (e.kind ?? 'expense') === 'expense')
+          .filter((e) => (e.kind ?? 'expense') === 'expense' || (e.kind === 'transfer' && e.credit !== null))
           .map((e) => ({ label: label(e, displayName(e.description || e.name_raw || 'Expense')), amount: Number(e.credit ?? e.pos_amount ?? 0) }))
     const otherIncome: Line[] = Array.isArray(snap?.other_income)
       ? (snap!.other_income as Line[])
       : cash
-          .filter((e) => e.kind === 'insurer_payment' || (e.kind !== 'expense' && e.kind !== undefined && OTHER_INCOME.test(e.description ?? '')))
+          .filter(
+            (e) =>
+              e.kind === 'insurer_payment' ||
+              (e.kind === 'transfer' && e.credit === null) ||
+              (e.kind !== 'expense' && e.kind !== 'transfer' && e.kind !== undefined && OTHER_INCOME.test(e.description ?? '')),
+          )
           .map((e) => ({
             label: label(e, e.kind === 'insurer_payment' ? `${displayName(e.name_raw ?? '')} payment` : displayName(e.description ?? 'Other income')),
             amount: Number(e.debit ?? e.pos_amount ?? 0),

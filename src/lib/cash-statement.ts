@@ -165,9 +165,10 @@ const CLIENT_WORDS = /session|package|pkg|physio|insurance/
 
 /**
  * Cash moved between the drawer and the clinic's bank accounts: a deposit
- * out, or money in from a bank ("sgbl", "audi bank neo · cash"). Not income
- * or spending, though it moves the balance. A client paying "… sgbl" is
- * still a client payment. Mirrored in 20261105100000_bank_transfers.sql.
+ * out, or money in from a bank ("sgbl", "audi bank neo · cash"). The report
+ * shows deposits as expenses and bank money as other income; keeping them
+ * apart stops a bank line from being matched to a client. A client paying
+ * "… sgbl" is still a client payment. Mirrored in 20261105100000_bank_transfers.sql.
  */
 export function isBankTransfer(nameRaw: string, description: string, debit: number | null, credit: number | null): boolean {
   const desc = normalizeName(description)

@@ -120,12 +120,13 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   const otherIncome: IncomeLine[] = []
   const asIncome = input.asIncome ?? new Set<string>()
   const asSession = input.asSession ?? new Set<string>()
+  // Drawer <-> bank (her choice, 2026-11-05): a deposit is an expense and money
+  // from the bank is other income, so the report adds up to the statement's columns.
   const isOtherIncome = (c: CashInput) =>
-    asIncome.has(c.id) || (!asSession.has(c.id) && (c.kind === 'insurer_payment' || OTHER_INCOME.test(c.description ?? '')))
+    asIncome.has(c.id) ||
+    (!asSession.has(c.id) && (c.kind === 'insurer_payment' || c.kind === 'transfer' || OTHER_INCOME.test(c.description ?? '')))
   for (const c of input.cash) {
-    // Drawer <-> bank: not income or spending (the balance still shows it).
-    if (c.kind === 'transfer') continue
-    if (c.kind === 'expense') {
+    if (c.kind === 'expense' || (c.kind === 'transfer' && c.credit !== null)) {
       const matchKey = expenseKey(c.name_raw, c.description)
       expenses.push({
         cashId: c.id,

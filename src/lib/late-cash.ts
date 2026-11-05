@@ -27,9 +27,9 @@ const sameLine = (a: LateCashInput, b: LateCashInput) =>
   Number(a.pos_amount ?? 0) === Number(b.pos_amount ?? 0)
 
 /**
- * Per confirmed day, the lines added after she confirmed it. Bank transfers
- * don't count, nor a line that only came back under a new key (its old copy,
- * now missing from the file, was there when she confirmed).
+ * Per confirmed day, the lines added after she confirmed it. A line that only
+ * came back under a new key doesn't count (its old copy, now missing from the
+ * file, was there when she confirmed).
  */
 export function lateCash(
   reviews: Array<{ date: string; confirmed_at: string | null }>,
@@ -43,7 +43,6 @@ export function lateCash(
     const lines = day.filter(
       (c) =>
         !c.missing_from_source &&
-        c.kind !== 'transfer' &&
         Date.parse(c.created_at) > confirmedAt &&
         !day.some((o) => o.missing_from_source && Date.parse(o.created_at) <= confirmedAt && sameLine(o, c)),
     )

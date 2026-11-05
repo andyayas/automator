@@ -33,11 +33,10 @@ describe('lateCash', () => {
     expect(late).toEqual([{ date: '2026-10-29', lines: [expect.objectContaining({ id: 'after' })] }])
   })
 
-  it('ignores bank transfers and lines that only came back under a new key', () => {
+  it('ignores lines that only came back under a new key', () => {
     const late = lateCash(reviews, [
       line({ id: 'old copy', missing_from_source: true, kind: 'expense', name_raw: 'acme', description: 'delivery', debit: null, credit: 4 }),
       line({ id: 'new copy', created_at: '2026-10-31T09:00:00+00:00', kind: 'expense', name_raw: 'acme', description: 'delivery', debit: null, credit: 4 }),
-      line({ id: 'deposit', created_at: '2026-10-31T09:00:00+00:00', kind: 'transfer', description: 'deposit', debit: null, credit: 500 }),
     ])
     expect(late).toEqual([])
   })

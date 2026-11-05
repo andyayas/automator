@@ -292,7 +292,7 @@ export async function fetchMonth(month: string, today: string, reviewsFrom: stri
       .select('date, name_raw, description, credit, debit, pos_amount, kind')
       .gte('date', from)
       .lte('date', to)
-      .in('kind', ['expense', 'insurer_payment', 'other', 'session'])
+      .in('kind', ['expense', 'insurer_payment', 'other', 'session', 'transfer'])
       .eq('missing_from_source', false),
     supabase.from('expense_labels').select('match_key, label'),
     supabase.from('schedule_entries').select('date').gte('date', from).lte('date', to < today ? to : today).eq('is_non_client', false),

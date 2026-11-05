@@ -440,6 +440,15 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   (Bodydot, body composition, InBody). Outdoor sessions count here, not as
   clinic sessions. She can move any cash row between other income and a
   client session. Income = collected + other income; Net = income − expenses.
+- **Bank movements** (2026-11-05): cash between the drawer and the clinic's
+  bank accounts (Audi Neo deposits, money in from SGBL) is cash kind
+  `transfer` (`isBankTransfer`), so it is never matched to a client. By the
+  owner's choice the report still counts it: a deposit is an expense, bank
+  money is other income, so each day adds up to the statement's Debit and
+  Credit columns. POS payments are not collected (the money goes to the bank).
+- **Late cash lines** (2026-11-05): lines added to the statement after a day
+  was confirmed are listed on Today and the day page (`src/lib/late-cash.ts`);
+  Edit this day takes them in.
 - **Daily reviews start on 8 October 2026** (`settings.reviews_from`): she made
   the 1–7 October reports by hand, so earlier days aren't listed as "not
   confirmed".
