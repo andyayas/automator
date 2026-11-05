@@ -1,7 +1,7 @@
 // Synthetic rows only.
 import { describe, expect, it } from 'vitest'
 import { utils } from 'xlsx'
-import { amountIn, parseCashStatement, toISODate } from './cash-statement'
+import { amountIn, isBankTransfer, parseCashStatement, toISODate } from './cash-statement'
 
 const HEAD = ['Date', 'Client Name', 'Description', 'Receipt/PV', 'Debit in $', 'Credit in $', 'Balance in $']
 
@@ -64,6 +64,19 @@ describe('parseCashStatement', () => {
   it('counts "single physio" as a session payment, even without the word session', () => {
     const one = parseCashStatement(book({ October: [[new Date(2026, 9, 27), 'testg person', 'single physio', 'rc41', 40, null]] })).rows[0]
     expect(one).toMatchObject({ kind: 'session', debit: 40 })
+  })
+
+  it('tells cash moved to or from the bank apart from income and spending', () => {
+    expect(isBankTransfer('audi bank neo', 'deposit', null, 1500)).toBe(true)
+    expect(isBankTransfer('audi bank neo', 'cash', 28, null)).toBe(true)
+    expect(isBankTransfer('sgbl', 'collect from account', 650, null)).toBe(true)
+    expect(isBankTransfer('testco sarl', 'payment sgbl', 150, null)).toBe(true)
+    // A client paying through the bank, and expenses that mention one, stay as they are.
+    expect(isBankTransfer('testa person', '2 physio sessions 90$ sgbl', 90, null)).toBe(false)
+    expect(isBankTransfer('acme delivery', 'papers to sgbl', null, 10)).toBe(false)
+    expect(isBankTransfer('testb person', 'coffee+bank commission', null, 100)).toBe(false)
+    const wb = book({ October: [[new Date(2026, 9, 16), 'audi bank neo', 'deposit', 'pv9', null, 1500]] })
+    expect(parseCashStatement(wb).rows[0].kind).toBe('transfer')
   })
 
   it('skips repeated headers and totals', () => {

@@ -123,6 +123,8 @@ export function buildDayDraft(input: DayInputs): DayDraft {
   const isOtherIncome = (c: CashInput) =>
     asIncome.has(c.id) || (!asSession.has(c.id) && (c.kind === 'insurer_payment' || OTHER_INCOME.test(c.description ?? '')))
   for (const c of input.cash) {
+    // Drawer <-> bank: not income or spending (the balance still shows it).
+    if (c.kind === 'transfer') continue
     if (c.kind === 'expense') {
       const matchKey = expenseKey(c.name_raw, c.description)
       expenses.push({

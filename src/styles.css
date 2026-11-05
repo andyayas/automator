@@ -1592,6 +1592,11 @@ details.card[open] > summary {
   border-color: var(--border);
 }
 
+.late-lines {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;

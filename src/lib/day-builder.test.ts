@@ -476,3 +476,19 @@ describe('package paid status and the cash balance', () => {
     expect(data.sections.package[0]).toMatchObject({ collected: 0, paid: 'Paid', paidInFull: true })
   })
 })
+
+describe('bank transfers', () => {
+  it('leaves money moved to or from the bank out of income and expenses', () => {
+    const d = buildDayDraft(
+      inputs({
+        cash: [
+          cash({ name_raw: 'audi bank neo', description: 'deposit', debit: null, credit: 500, kind: 'transfer' }),
+          cash({ name_raw: 'audi bank neo', description: 'cash', debit: 28, kind: 'transfer' }),
+        ],
+      }),
+    )
+    expect(d.rows).toEqual([])
+    expect(d.expenses).toEqual([])
+    expect(d.otherIncome).toEqual([])
+  })
+})

@@ -1,12 +1,21 @@
 import { Link } from 'react-router'
 import { CheckIcon, ClientsIcon, PendingIcon, RemindersIcon } from '../layout/icons'
 import { formatDate } from '../lib/format'
-import { useCheckinsDue } from '../lib/queries'
+import { SETTING } from '../lib/defaults'
+import { useCheckinsDue, useLateCash, useSettings } from '../lib/queries'
 import { useReviewDays, workingDay } from '../lib/review-days'
 import { Badge } from './ui'
 
 const dayLabel = (date: string) =>
   new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })
+
+/** Late lines are looked for over the last two months (the reach of balance updates too). */
+function lateFrom(today: string, reviewsFrom: string): string {
+  const d = new Date(`${today}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 62)
+  const from = d.toISOString().slice(0, 10)
+  return reviewsFrom > from ? reviewsFrom : from
+}
 
 /** Today screen: the day's tasks (review yesterday and today, send tomorrow's reminders). */
 export function DailyReviewCard() {
@@ -14,6 +23,9 @@ export function DailyReviewCard() {
   const reminderDay = workingDay(today, 1)
   const checkins = useCheckinsDue(today)
   const checkinCount = checkins.data?.length ?? 0
+  const settings = useSettings()
+  const reviewsFrom = (settings.data?.[SETTING.reviewsFrom] as string | undefined) ?? ''
+  const late = useLateCash(settings.data ? lateFrom(today, reviewsFrom) : null)
   return (
     <>
       <div className="card list">
@@ -55,6 +67,19 @@ export function DailyReviewCard() {
           </Link>
         )}
       </div>
+      {(late.data?.length ?? 0) > 0 && (
+        <div className="card notice earlier-days">
+          <p className="small strong">New cash statement lines on confirmed days</p>
+          <p className="muted small">Open the day and tap Edit this day to add them to the report.</p>
+          <div className="chips">
+            {late.data!.map(({ date }) => (
+              <Link key={date} to={`/day/${date}`} className="chip">
+                {formatDate(date, { short: true })}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
       {earlier.length > 0 && (
         <div className="card notice earlier-days">
           <p className="small strong">Earlier days not confirmed yet</p>

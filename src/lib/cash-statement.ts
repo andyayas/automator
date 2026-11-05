@@ -7,7 +7,7 @@ import { sheetRows } from './sheet-rows'
 import { toISODate } from './dates'
 import { normalizeName } from './names'
 
-export type CashKind = 'session' | 'package' | 'insurance_copay' | 'insurer_payment' | 'expense' | 'other'
+export type CashKind = 'session' | 'package' | 'insurance_copay' | 'insurer_payment' | 'expense' | 'other' | 'transfer'
 export type CashMethod = 'cash' | 'pos' | 'transfer'
 
 export type CashRow = {
@@ -101,8 +101,9 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
           : 'cash'
       const pkg = PACKAGE.exec(description)
       const name = normalizeName(nameRaw)
-      const kind: CashKind =
-        (voucher?.startsWith('pv') || credit !== null) && debit === null
+      const kind: CashKind = isBankTransfer(nameRaw, description, debit, credit)
+        ? 'transfer'
+        : (voucher?.startsWith('pv') || credit !== null) && debit === null
           ? 'expense'
           : pkg || /\bpackage\b/.test(descLower)
             ? 'package'
@@ -157,6 +158,21 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
     return { ...r, sourceKey: n === 1 ? key : `${key}#${n}` }
   })
   return { rows: result, skipped, sheets, fixedDates }
+}
+
+const BANK = /\b(audi|sgbl|bank)\b/
+const CLIENT_WORDS = /session|package|pkg|physio|insurance/
+
+/**
+ * Cash moved between the drawer and the clinic's bank accounts: a deposit
+ * out, or money in from a bank ("sgbl", "audi bank neo · cash"). Not income
+ * or spending, though it moves the balance. A client paying "… sgbl" is
+ * still a client payment. Mirrored in 20261105100000_bank_transfers.sql.
+ */
+export function isBankTransfer(nameRaw: string, description: string, debit: number | null, credit: number | null): boolean {
+  const desc = normalizeName(description)
+  if (credit !== null && debit === null) return /^deposit\b/.test(desc)
+  return debit !== null && (BANK.test(normalizeName(nameRaw)) || BANK.test(desc)) && !CLIENT_WORDS.test(desc)
 }
 
 /** Money in for a row: debit, or the amount written in the description (POS etc.). */

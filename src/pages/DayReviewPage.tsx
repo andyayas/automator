@@ -12,6 +12,7 @@ import { buildDayDraft, SECTION_LABEL, SECTION_ORDER, type BillingType, type Day
 import { applyEdits, closingBalance, editsFromSessions, emptyEdits, frozenEdits, toReportData, type DayEdits, type RowEdit } from '../lib/day-edits'
 import { DEFAULT_PRICES, SETTING } from '../lib/defaults'
 import { monthReportDays, monthUpTo } from '../lib/month-report'
+import { takeLateCash, type LateCashInput } from '../lib/late-cash'
 import { formatDate, formatMoney, formatTime, numberText, parseNumber, plural, todayISO } from '../lib/format'
 import {
   useApprovals,
@@ -20,6 +21,7 @@ import {
   useDayReview,
   useExpenseLabels,
   useInvalidate,
+  useLateCash,
   useLatestCashDate,
   usePackages,
   useScheduleDay,
@@ -66,6 +68,8 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
   const labels = useExpenseLabels()
   const settings = useSettings()
   const review = useDayReview(date)
+  const late = useLateCash(date, date)
+  const lateLines = late.data?.[0]?.lines ?? []
   const latestCash = useLatestCashDate()
   const reviewsFrom = (settings.data?.[SETTING.reviewsFrom] as string | undefined) ?? null
   // The month so far: every report is one file with a tab per confirmed day up to this one.
@@ -243,7 +247,9 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
     setBusy('Opening the day…')
     try {
       const saved = review.data?.review?.edits as unknown as DayEdits | null
-      const restored = saved ? { ...emptyEdits(), ...saved } : draft ? editsFromSessions(draft, review.data?.sessions ?? []) : emptyEdits()
+      const confirmedEdits = saved ? { ...emptyEdits(), ...saved } : draft ? editsFromSessions(draft, review.data?.sessions ?? []) : emptyEdits()
+      // Money added to the cash statement since she confirmed comes in on reopening.
+      const restored = draft ? takeLateCash(confirmedEdits, [...draft.rows, ...draft.excluded], new Set(lateLines.map((l) => l.id))) : confirmedEdits
       await reopenDay(date)
       storeEdits(date, restored)
       setEdits(restored)
@@ -300,6 +306,7 @@ function DayReview({ date, onDate }: { date: string; onDate: (d: string) => void
           sessions={review.data!.sessions}
           confirmedAt={review.data!.review!.confirmed_at!}
           monthNote={<MonthTabsNote date={date} month={month.data} />}
+          lateLines={lateLines}
           busy={busy}
           onDownload={onDownload}
           onReopen={onReopen}
@@ -988,6 +995,7 @@ function ConfirmedDay({
   sessions,
   confirmedAt,
   monthNote,
+  lateLines,
   busy,
   onDownload,
   onReopen,
@@ -996,12 +1004,32 @@ function ConfirmedDay({
   sessions: Array<{ id: string; client_name: string | null; billing_type: string; billed: number; collected: number; session_no: number | null; therapist: string | null }>
   confirmedAt: string
   monthNote: ReactNode
+  lateLines: LateCashInput[]
   busy: string | null
   onDownload: () => void
   onReopen: () => void
 }) {
   return (
     <>
+      {lateLines.length > 0 && (
+        <div className="card notice stack">
+          <p className="small strong">Added to the cash statement after you confirmed</p>
+          <ul className="small late-lines">
+            {lateLines.map((l) => (
+              <li key={l.id}>
+                {[l.name_raw, l.description].filter(Boolean).join(' · ') || 'No description'}:{' '}
+                {l.credit !== null ? `−${formatMoney(Number(l.credit))}` : formatMoney(Number(l.debit ?? l.pos_amount ?? 0))}
+              </li>
+            ))}
+          </ul>
+          <div className="inline-action">
+            <p className="small">The report doesn’t include them yet. Edit this day and confirm again to add them.</p>
+            <button type="button" className="button small-button warn" disabled={Boolean(busy)} onClick={onReopen}>
+              Edit this day
+            </button>
+          </div>
+        </div>
+      )}
       <div className="card day-summary">
         <div>
           <p className="strong">Confirmed ✓</p>

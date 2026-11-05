@@ -67,6 +67,9 @@ export const useExpenseLabels = () => useQuery({ queryKey: keys.expenseLabels, q
 export const useTemplateInfo = () => useQuery({ queryKey: keys.template, queryFn: day.templateInfo })
 export const useCheckinsDue = (today: string) => useQuery({ queryKey: ['checkins', today], queryFn: () => checkins.fetchCheckinsDue(today) })
 export const useLatestCashDate = () => useQuery({ queryKey: keys.latestCash, queryFn: day.fetchLatestCashDate })
+/** Confirmed days with cash lines added after she confirmed them (under 'day-review', so uploads refresh it). */
+export const useLateCash = (from: string | null, to?: string) =>
+  useQuery({ queryKey: ['day-review', 'late-cash', from, to ?? null], queryFn: () => day.fetchLateCash(from!, to), enabled: Boolean(from) })
 
 /** Refetch everything that shows packages or approvals after a change. */
 export function useInvalidate() {

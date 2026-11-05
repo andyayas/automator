@@ -6,6 +6,7 @@ import type { DayRow, ExpenseLine } from './day-builder'
 import type { DayEdits } from './day-edits'
 import type { Json } from './database.types'
 import builtInTemplateUrl from '../assets/daily-report-template.xlsx?url'
+import { lateCash } from './late-cash'
 import { monthRange } from './month-report'
 import { supabase } from './supabase'
 
@@ -37,6 +38,23 @@ export async function fetchCashForDay(date: string): Promise<CashRowForDay[]> {
     .eq('missing_from_source', false)
   fail(error)
   return data
+}
+
+/** Confirmed days from `from` (to `to`) with cash lines added after she confirmed them. */
+export async function fetchLateCash(from: string, to?: string) {
+  let reviews = supabase.from('day_reviews').select('date, confirmed_at').gte('date', from).not('confirmed_at', 'is', null)
+  let cash = supabase
+    .from('cash_transactions')
+    .select('id, date, created_at, missing_from_source, kind, name_raw, description, debit, credit, pos_amount')
+    .gte('date', from)
+  if (to) {
+    reviews = reviews.lte('date', to)
+    cash = cash.lte('date', to)
+  }
+  const [r, c] = await Promise.all([reviews, cash.order('date').limit(5000)])
+  fail(r.error)
+  fail(c.error)
+  return lateCash(r.data, c.data)
 }
 
 export async function fetchLatestCashDate(): Promise<string | null> {
