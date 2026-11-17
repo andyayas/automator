@@ -143,6 +143,7 @@ describe('with the clinic’s built-in template', () => {
         package: [row('Omar Sample', { billed: 38, paid: 'Paid', paidInFull: true }), row('Rami Testa', { billed: 38, paid: '$300 due', paidInFull: false })],
       },
       cashBalance: 1234,
+      bankBalance: 1000,
     })
     const wb = new ExcelJS.Workbook()
     await wb.xlsx.load(out as unknown as ArrayBuffer)
@@ -161,6 +162,11 @@ describe('with the clinic’s built-in template', () => {
     expect((ws.getCell(paidCell).fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFDCF2E3')
     expect((ws.getCell(dueCell).fill as ExcelJS.FillPattern).fgColor?.argb).toBe('FFFDE4E1')
     expect(ws.getCell(`G${balanceRow}`).value).toBe(1234)
+    // The Audi Neo part of it, and the rest (in the drawer) as a formula.
+    expect(ws.getCell(`F${balanceRow + 1}`).value).toBe('Audi Bank Balance')
+    expect(ws.getCell(`G${balanceRow + 1}`).value).toBe(1000)
+    expect(ws.getCell(`F${balanceRow + 2}`).value).toBe('Cash Balance')
+    expect(ws.getCell(`G${balanceRow + 2}`).value).toMatchObject({ formula: `G${balanceRow}-G${balanceRow + 1}`, result: 234 })
     const zip = await JSZip.loadAsync(out)
     const sheet = await zip.file(Object.keys(zip.files).find((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n))!)!.async('string')
     expect(sheet).toContain('numberStoredAsText="1"')

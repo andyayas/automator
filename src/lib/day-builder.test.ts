@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
-import { applyEdits, closingBalance, editsFromSessions, emptyEdits, frozenEdits, packagePaid, sessionLabel, toReportData } from './day-edits'
+import { applyEdits, bankBalance, closingBalance, editsFromSessions, emptyEdits, frozenEdits, packagePaid, sessionLabel, toReportData } from './day-edits'
 import { monthReportDays, monthUpTo } from './month-report'
 
 const base = {
@@ -490,5 +490,20 @@ describe('bank transfers', () => {
     expect(d.rows).toEqual([])
     expect(d.expenses.map((e) => [e.label, e.amount])).toEqual([['Deposit', 500]])
     expect(d.otherIncome.map((e) => [e.label, e.amount])).toEqual([['Cash · Audi Bank Neo', 28]])
+  })
+})
+
+describe('bankBalance', () => {
+  it('adds up the month’s Audi Neo amounts up to the day', () => {
+    const rows = [
+      { date: '2026-10-30', bank: 999 },
+      { date: '2026-11-02', bank: 500 },
+      { date: '2026-11-04', bank: null },
+      { date: '2026-11-06', bank: 600 },
+      { date: '2026-11-11', bank: 2300 },
+    ]
+    expect(bankBalance(rows, '2026-11-06')).toBe(1100)
+    expect(bankBalance(rows, '2026-11-30')).toBe(3400)
+    expect(bankBalance(rows, '2026-11-01')).toBeNull()
   })
 })

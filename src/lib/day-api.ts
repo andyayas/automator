@@ -298,10 +298,10 @@ export async function fetchMonth(month: string, today: string, reviewsFrom: stri
     supabase.from('schedule_entries').select('date').gte('date', from).lte('date', to < today ? to : today).eq('is_non_client', false),
     supabase
       .from('cash_transactions')
-      .select('date, balance, source_row')
+      .select('date, balance, source_row, bank')
       .gte('date', from)
       .lte('date', to)
-      .not('balance', 'is', null)
+      .or('balance.not.is.null,bank.not.is.null')
       .eq('missing_from_source', false),
   ])
   for (const r of [reviews, sessions, expenses, labels, scheduled, balances]) fail(r.error)

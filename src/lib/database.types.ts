@@ -17,6 +17,7 @@ export type Database = {
       cash_transactions: {
         Row: {
           balance: number | null
+          bank: number | null
           client_id: string | null
           created_at: string
           credit: number | null
@@ -39,6 +40,7 @@ export type Database = {
         }
         Insert: {
           balance?: number | null
+          bank?: number | null
           client_id?: string | null
           created_at?: string
           credit?: number | null
@@ -61,6 +63,7 @@ export type Database = {
         }
         Update: {
           balance?: number | null
+          bank?: number | null
           client_id?: string | null
           created_at?: string
           credit?: number | null

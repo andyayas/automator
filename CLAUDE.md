@@ -446,6 +446,12 @@ go-live seed uses it ahead of schedule session numbers and file counts.
   owner's choice the report still counts it: a deposit is an expense, bank
   money is other income, so each day adds up to the statement's Debit and
   Credit columns. POS payments are not collected (the money goes to the bank).
+- **Audi Neo balance** (2026-11-17): from November the statement has an
+  "Audi Neo $" column (money put in the Audi Neo account, summed at the bottom
+  of the month). Uploads save it per line (`cash_transactions.bank`, quietly
+  like the balance). Under Balance the report shows **Audi Bank Balance** (the
+  month's Audi Neo amounts up to that day, `bankBalance`) and **Cash Balance**
+  (Balance − Audi Bank Balance).
 - **Late cash lines** (2026-11-05): lines added to the statement after a day
   was confirmed are listed on Today and the day page (`src/lib/late-cash.ts`);
   Edit this day takes them in.
@@ -512,7 +518,8 @@ nothing until she accepts them.
   (unique per owner; see "Voucher numbers are recycled"),
   debit, credit, method (cash/pos), pos_amount, kind
   (session/package/insurance_copay/insurer_payment/expense/other), client_id,
-  import_id, balance (the statement's running "Balance In $" on that row)
+  import_id, balance (the statement's running "Balance In $" on that row),
+  bank (its "Audi Neo $" amount, from November 2026)
 - `schedule_entries`: date, slot_time, therapist, raw_text, parsed_name,
   status, session_no, inline_amount, client_id, import_id
 - `day_sessions`: date, client_id, therapist, billing_type, package_id,

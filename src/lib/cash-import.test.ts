@@ -19,6 +19,7 @@ function cash(over: Partial<CashRow>): CashRow {
     kind: 'session',
     packageSessions: null,
     balance: null,
+    bank: null,
     sourceKey: '2026-10-01|rc1',
     ...over,
   }
@@ -29,6 +30,7 @@ const stored = (over: Partial<StoredCash>): StoredCash => ({
   date: '2026-10-01',
   source_key: '2026-10-01|rc1',
   balance: null,
+  bank: null,
   name_raw: 'jane testerson',
   description: 'single physio session',
   debit: 45,

@@ -193,6 +193,16 @@ export function packagePaid(p: { amount_paid: number | null; price_total: number
 }
 
 /** The cash statement's balance after a day's last line (the row lowest in the sheet that has one). */
+/**
+ * The Audi Neo bank balance on a day: the month's "Audi Neo $" amounts up to
+ * and including that day (the column restarts each month, its SUM is at the
+ * bottom). Null when the month has no Audi Neo amounts yet.
+ */
+export function bankBalance(rows: Array<{ date: string; bank?: number | null }>, date: string): number | null {
+  const month = rows.filter((r) => r.date.slice(0, 7) === date.slice(0, 7) && r.date <= date && r.bank !== null && r.bank !== undefined)
+  return month.length ? month.reduce((s, r) => s + Number(r.bank), 0) : null
+}
+
 export function closingBalance(rows: Array<{ balance: number | null; source_row: number | null }>): number | null {
   const withBalance = rows.filter((r) => r.balance !== null && r.balance !== undefined)
   if (!withBalance.length) return null

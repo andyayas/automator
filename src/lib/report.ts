@@ -32,6 +32,8 @@ export type ReportData = {
   packageNotPaid: number
   /** The cash statement's running balance after the day's last line, when known. */
   cashBalance?: number | null
+  /** Money in the Audi Neo bank account so far this month (the statement's "Audi Neo $" column). */
+  bankBalance?: number | null
 }
 
 type Style = Partial<ExcelJS.Style>
@@ -332,6 +334,13 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   // The cash statement's balance after the day's last line (its "Balance In $" column).
   put(`F${incomeTop + 6}`, 'Balance', s.sumLabel)
   put(`G${incomeTop + 6}`, data.cashBalance ?? null, money)
+  // From November 2026: the part of it in the Audi Neo account, and the rest, in the drawer.
+  if (data.bankBalance !== null && data.bankBalance !== undefined) {
+    put(`F${incomeTop + 7}`, 'Audi Bank Balance', s.sumLabel)
+    put(`G${incomeTop + 7}`, data.bankBalance, money)
+    put(`F${incomeTop + 8}`, 'Cash Balance', s.sumLabel)
+    put(`G${incomeTop + 8}`, data.cashBalance === null || data.cashBalance === undefined ? null : f(`G${incomeTop + 6}-G${incomeTop + 7}`, data.cashBalance - data.bankBalance), money)
+  }
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }
   // The template hides gridlines (showGridLines="false"), but ExcelJS reads that

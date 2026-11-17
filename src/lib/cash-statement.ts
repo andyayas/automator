@@ -28,6 +28,8 @@ export type CashRow = {
   packageSessions: number | null
   /** The running balance on this row (the "Balance" column), when there is one. */
   balance: number | null
+  /** Money put in the Audi Neo bank account on this row (the "Audi Neo $" column, from November 2026). */
+  bank: number | null
   /** Stable identity across re-uploads: date + voucher, or a content key. */
   sourceKey: string
 }
@@ -67,8 +69,11 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
     const cols = findColumns(data)
     if (!cols) continue
     const balanceCol = findBalanceColumn(data)
+    const bankCol = findBankColumn(data)
     sheets.push(sheet)
     let currentDate: string | null = null
+    // Below the month's "Total" line come sums (the Audi Neo column's SUM), not amounts.
+    let ended = false
 
     for (let i = 6; i < data.length; i++) {
       const r = data[i] ?? []
@@ -79,11 +84,19 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
       const voucherRaw = text(r[cols.voucher])
       const debit = money(r[cols.debit])
       const credit = money(r[cols.credit])
-      if (!nameRaw && !description && !voucherRaw && debit === null && credit === null) continue
+      const bank = bankCol === null ? null : money(r[bankCol])
+      const isTotal = [r[cols.date], nameRaw, description].some((v) => /^total\b/i.test(text(v)))
+      if (isTotal) ended = true
+      if (!nameRaw && !description && !voucherRaw && debit === null && credit === null) {
+        // An Audi Neo amount on a line of its own still counts, on that day.
+        const last = rows.at(-1)
+        if (bank !== null && !ended && last?.sheet === sheet && last.date === currentDate) last.bank = (last.bank ?? 0) + bank
+        continue
+      }
 
       const descLower = description.toLowerCase()
       // Repeated header rows and monthly "total" lines are not transactions.
-      if (descLower === 'description' || nameRaw.toLowerCase() === 'client name' || /^total\b/.test(descLower) || /^total\b/i.test(nameRaw)) {
+      if (descLower === 'description' || nameRaw.toLowerCase() === 'client name' || isTotal) {
         skipped++
         continue
       }
@@ -131,20 +144,22 @@ export function parseCashStatement(workbook: WorkBook, opts: { insurers?: string
         kind,
         packageSessions: pkg ? Number(pkg[2]) : null,
         balance: balanceCol === null ? null : money(r[balanceCol]),
+        bank: ended ? null : bank,
       })
     }
   }
 
   // A year that differs from the rest of the file, in a tab named after that
   // date's month, is a typo (2029-03-28 in "March" of a 2026 file).
+  // Years can be short too ("226-11-09" from a date typed as 9/11/226).
   const yearCounts = new Map<string, number>()
-  for (const r of rows) yearCounts.set(r.date.slice(0, 4), (yearCounts.get(r.date.slice(0, 4)) ?? 0) + 1)
+  for (const r of rows) yearCounts.set(r.date.split('-')[0], (yearCounts.get(r.date.split('-')[0]) ?? 0) + 1)
   const mainYear = [...yearCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   const fixedDates: string[] = []
   for (const r of rows) {
-    const month = Number(r.date.slice(5, 7)) - 1
-    if (mainYear && !r.date.startsWith(mainYear) && r.sheet.trim().toLowerCase().startsWith(MONTHS[month])) {
-      const fixed = `${mainYear}${r.date.slice(4)}`
+    const [year, month, day] = r.date.split('-')
+    if (mainYear && year !== mainYear && r.sheet.trim().toLowerCase().startsWith(MONTHS[Number(month) - 1])) {
+      const fixed = `${mainYear}-${month}-${day}`
       fixedDates.push(`${r.sheet} row ${r.row}: ${r.date} read as ${fixed}`)
       r.date = fixed
     }
@@ -186,6 +201,15 @@ function findBalanceColumn(data: unknown[][]): number | null {
       const h = normalizeName(cell)
       return /^balance\b/.test(h) && !/\blbp\b/.test(h)
     })
+    if (c >= 0) return c
+  }
+  return null
+}
+
+/** The "Audi Neo $" column (November 2026 on), from the header row. Optional. */
+function findBankColumn(data: unknown[][]): number | null {
+  for (let i = 0; i < Math.min(6, data.length); i++) {
+    const c = (data[i] ?? []).findIndex((cell) => /\baudi\b/.test(normalizeName(cell)))
     if (c >= 0) return c
   }
   return null

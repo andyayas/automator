@@ -79,6 +79,32 @@ describe('parseCashStatement', () => {
     expect(parseCashStatement(wb).rows[0].kind).toBe('transfer')
   })
 
+  it('reads the Audi Neo column, a lone Audi Neo amount, and not its SUM below the total', () => {
+    const head = [...HEAD, 'Audi Neo $']
+    const ws = utils.aoa_to_sheet([
+      [], [], [null, null, null, ...head], [], [], [null, null, null, null, null, null, null, null, null, 100],
+      [null, null, null, new Date(2026, 10, 2), 'acme bank', 'deposit', 'pv1', null, 500, -400, 500],
+      [null, null, null, new Date(2026, 10, 4), 'testa person', 'package of 12', 'rc1', 250, null, -150, 1000],
+      [null, null, null, null, null, null, null, null, null, null, 300],
+      [null, null, null, 'Total', null, null, null, 250, 500, -150],
+      [null, null, null, null, null, null, null, null, null, -150, 1800],
+    ])
+    const wb = utils.book_new()
+    utils.book_append_sheet(wb, ws, 'November')
+    const { rows } = parseCashStatement(wb)
+    expect(rows.map((r) => [r.date, r.bank])).toEqual([
+      ['2026-11-02', 500],
+      ['2026-11-04', 1300],
+    ])
+  })
+
+  it('fixes a year typed short ("226")', () => {
+    const wb = book({ November: [[new Date(2026, 10, 2), 'testa person', 'single physio session', 'rc1', 45, null], [new Date(226, 10, 9), 'testb person', 'single physio session', 'rc2', 40, null]] })
+    const { rows, fixedDates } = parseCashStatement(wb)
+    expect(rows[1]).toMatchObject({ date: '2026-11-09', sourceKey: '2026-11-09|rc2' })
+    expect(fixedDates).toHaveLength(1)
+  })
+
   it('skips repeated headers and totals', () => {
     expect(skipped).toBe(2)
     expect(rows).toHaveLength(9)
