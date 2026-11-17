@@ -203,6 +203,14 @@ export function bankBalance(rows: Array<{ date: string; bank?: number | null }>,
   return month.length ? month.reduce((s, r) => s + Number(r.bank), 0) : null
 }
 
+/** The balance at the end of a day: its last line's, or, on a day with no lines, the last one before it. */
+export function balanceOn(rows: Array<{ date: string; balance: number | null; source_row: number | null }>, date: string): number | null {
+  const before = rows.filter((r) => r.date <= date && r.balance !== null && r.balance !== undefined)
+  if (!before.length) return null
+  const last = before.reduce((a, b) => (b.date > a.date || (b.date === a.date && (b.source_row ?? 0) > (a.source_row ?? 0)) ? b : a))
+  return Number(last.balance)
+}
+
 export function closingBalance(rows: Array<{ balance: number | null; source_row: number | null }>): number | null {
   const withBalance = rows.filter((r) => r.balance !== null && r.balance !== undefined)
   if (!withBalance.length) return null

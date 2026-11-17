@@ -331,15 +331,21 @@ function fillReportSheet(ws: ExcelJS.Worksheet, data: ReportData) {
   put(`G${incomeTop + 4}`, f(`C${expTotal}`, totalExpenses), money)
   put(`F${incomeTop + 5}`, 'Net', s.sumLabel)
   put(`G${incomeTop + 5}`, f(`G${incomeTop + 3}-G${incomeTop + 4}`, totalCollected + totalOther - totalExpenses), money)
-  // The cash statement's balance after the day's last line (its "Balance In $" column).
-  put(`F${incomeTop + 6}`, 'Balance', s.sumLabel)
-  put(`G${incomeTop + 6}`, data.cashBalance ?? null, money)
-  // From November 2026: the part of it in the Audi Neo account, and the rest, in the drawer.
+
+  // Balances (left, at the bottom, on their own): the cash statement's balance
+  // after the day's last line, and from November 2026 the part of it in the
+  // Audi Neo account and the rest, in the drawer.
+  const balTop = otherTotalRow + 2
+  span('A', 'B', balTop, 'Balances', s.expHeader)
+  put(`C${balTop}`, 'Amount', s.expHeaderNum)
+  span('A', 'B', balTop + 1, 'Balance', centred(s.expText))
+  put(`C${balTop + 1}`, data.cashBalance ?? null, centred(s.expNum))
   if (data.bankBalance !== null && data.bankBalance !== undefined) {
-    put(`F${incomeTop + 7}`, 'Audi Bank Balance', s.sumLabel)
-    put(`G${incomeTop + 7}`, data.bankBalance, money)
-    put(`F${incomeTop + 8}`, 'Cash Balance', s.sumLabel)
-    put(`G${incomeTop + 8}`, data.cashBalance === null || data.cashBalance === undefined ? null : f(`G${incomeTop + 6}-G${incomeTop + 7}`, data.cashBalance - data.bankBalance), money)
+    span('A', 'B', balTop + 2, 'Audi Bank Balance', centred(s.expText))
+    put(`C${balTop + 2}`, data.bankBalance, centred(s.expNum))
+    span('A', 'B', balTop + 3, 'Cash Balance', s.expTotal)
+    const cash = data.cashBalance === null || data.cashBalance === undefined ? null : f(`C${balTop + 1}-C${balTop + 2}`, data.cashBalance - data.bankBalance)
+    put(`C${balTop + 3}`, cash, centred(s.expTotalNum))
   }
 
   ws.pageSetup = { ...ws.pageSetup, fitToPage: true, fitToWidth: 1, fitToHeight: 0, orientation: 'portrait' }

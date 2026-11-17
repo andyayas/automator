@@ -3,7 +3,7 @@
 
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { expenseKey, OTHER_INCOME } from './day-builder'
-import { bankBalance, closingBalance, packagePaid, sessionLabel } from './day-edits'
+import { balanceOn, bankBalance, packagePaid, sessionLabel } from './day-edits'
 import { displayName } from './names'
 import type { ReportData, ReportRow } from './report'
 import type { Tables } from './database.types'
@@ -99,7 +99,7 @@ export function monthReportDays(input: {
         otherIncome,
         totalClients: new Set(sessions.map((s) => s.client_id ?? `name:${(s.client_name ?? '').toLowerCase()}`)).size,
         packageNotPaid: sessions.filter((s) => s.billing_type === 'package' && s.package_id && unpaid.has(s.package_id)).length,
-        cashBalance: closingBalance((input.balances ?? []).filter((b) => b.date === date)),
+        cashBalance: balanceOn(input.balances ?? [], date),
         bankBalance: bankBalance(input.balances ?? [], date),
       },
     }

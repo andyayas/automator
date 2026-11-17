@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ApprovalWithBalance, PackageWithBalance } from './api'
 import { buildDayDraft, type CashInput, type DayInputs, type EntryInput } from './day-builder'
-import { applyEdits, bankBalance, closingBalance, editsFromSessions, emptyEdits, frozenEdits, packagePaid, sessionLabel, toReportData } from './day-edits'
+import { applyEdits, balanceOn, bankBalance, closingBalance, editsFromSessions, emptyEdits, frozenEdits, packagePaid, sessionLabel, toReportData } from './day-edits'
 import { monthReportDays, monthUpTo } from './month-report'
 
 const base = {
@@ -505,5 +505,19 @@ describe('bankBalance', () => {
     expect(bankBalance(rows, '2026-11-06')).toBe(1100)
     expect(bankBalance(rows, '2026-11-30')).toBe(3400)
     expect(bankBalance(rows, '2026-11-01')).toBeNull()
+  })
+})
+
+describe('balanceOn', () => {
+  it('takes the day’s last line, or the last one before a day with no lines', () => {
+    const rows = [
+      { date: '2026-11-13', balance: 7018, source_row: 60 },
+      { date: '2026-11-13', balance: 7000, source_row: 58 },
+      { date: '2026-11-16', balance: 7063, source_row: 62 },
+    ]
+    expect(balanceOn(rows, '2026-11-13')).toBe(7018)
+    expect(balanceOn(rows, '2026-11-14')).toBe(7018)
+    expect(balanceOn(rows, '2026-11-16')).toBe(7063)
+    expect(balanceOn(rows, '2026-11-01')).toBeNull()
   })
 })
